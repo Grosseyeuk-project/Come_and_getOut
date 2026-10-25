@@ -205,3 +205,48 @@ export class Rain {
   }
   update(dt, focus) { this.u.uTime.value += dt; this.u.uFocus.value.set(focus.x, 0, focus.z); this.u.uScale.value = innerHeight / (2 * Math.tan(18 * Math.PI / 180)); }
 }
+
+// Volumetric key-light shafts: camera-facing ribbons along the sun/moon direction, drifting noise, faded at both
+// ends and near the ground so they read as light cutting through haze between the buildings.
+const SHAFT_VS = `
+  attribute vec4 aSeed; uniform float uTime; uniform vec3 uFocus; uniform vec3 uDir; uniform float uBox;
+  varying vec2 vQ; varying float vSeed; varying float vY;
+  void main(){
+    vec3 base = uFocus - vec3(uBox, 0.0, uBox) * 0.5;
+    vec3 g = vec3(base.x + mod(aSeed.x * uBox + uTime * 0.25 - base.x, uBox), 0.0, base.z + mod(aSeed.z * uBox - base.z, uBox));
+    float len = 26.0 + aSeed.y * 14.0, wid = 1.2 + aSeed.w * 3.2;
+    vec3 axis = uDir;                       // pointing up toward the light
+    vec3 mid = g + axis * len * 0.5;
+    vec3 vd = normalize(cameraPosition - mid);
+    vec3 side = normalize(cross(axis, vd));
+    vec3 w = mid + axis * position.y * len * 0.5 + side * position.x * wid;
+    vQ = position.xy; vSeed = aSeed.y; vY = w.y;
+    gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
+  }`;
+const SHAFT_FS = `
+  uniform float uTime; uniform vec3 uColor; varying vec2 vQ; varying float vSeed; varying float vY;
+  float n1(float x){ return fract(sin(x) * 43758.5453); }
+  float vn(float x){ float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(n1(i), n1(i + 1.0), f); }
+  void main(){
+    float across = 1.0 - abs(vQ.x); across *= across;
+    float streaks = 0.55 + 0.45 * vn(vQ.x * 3.0 + vSeed * 40.0 + uTime * 0.15);
+    float ends = smoothstep(-1.0, -0.55, vQ.y) * smoothstep(1.0, 0.3, vQ.y);
+    float ground = smoothstep(0.0, 2.5, vY);
+    float flick = 0.75 + 0.25 * vn(uTime * 0.4 + vSeed * 17.0);
+    gl_FragColor = vec4(uColor * across * streaks * ends * ground * flick, 1.0);
+  }`;
+
+export class Shafts {
+  constructor(scene, quality, dir, color, strength) {
+    const N = quality === 'high' ? 14 : 9;
+    const g = new THREE.InstancedBufferGeometry();
+    const q = new THREE.PlaneGeometry(2, 2); g.index = q.index; g.setAttribute('position', q.attributes.position);
+    const sd = new Float32Array(N * 4); for (let i = 0; i < N * 4; i++) sd[i] = Math.random();
+    g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(sd, 4)); g.instanceCount = N;
+    this.u = { uTime: { value: 0 }, uFocus: { value: new THREE.Vector3() }, uDir: { value: dir.clone().normalize() }, uBox: { value: 70 }, uColor: { value: new THREE.Color(color).multiplyScalar(strength) } };
+    const mat = new THREE.ShaderMaterial({ uniforms: this.u, vertexShader: SHAFT_VS, fragmentShader: SHAFT_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    this.mesh = new THREE.Mesh(g, mat); this.mesh.frustumCulled = false; this.mesh.renderOrder = 5;
+    scene.add(this.mesh);
+  }
+  update(dt, focus) { this.u.uTime.value += dt; this.u.uFocus.value.set(focus.x, 0, focus.z); }
+}

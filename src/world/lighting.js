@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { vnoise } from '../core/rng.js';
 import { atmo } from '../render/atmosphere.js';
-import { LightFx, Rain } from './lightingFx.js';
+import { LightFx, Rain, Shafts } from './lightingFx.js';
 
 const C3 = (h) => { const c = new THREE.Color(h); return { r: c.r, g: c.g, b: c.b }; };
 
@@ -17,29 +17,29 @@ export const PALETTES = {
     name: 'Burning Dusk', fog: 0x1a1a20, fogD: 0.012, haze: 0x40343a, fogH: [0.15, 0.05], scatter: 0.0009, mist: [0.42, 0.36, 0.34], embers: 1.0, ash: 0,
     sun: 0xff9c60, sunI: 2.5, sunDir: [-0.6, 0.62, -0.45], hemiS: 0x3a6070, hemiG: 0x1c140f, hemiI: 0.85,
     sky: [0x0a0c10, 0x24303a, 0x8a5a48], glows: [[0xff7a30, 1.8, -0.6, 0.15, -0.45], [0x30d0ff, 1.1, 0.7, 0.45, 0.3], [0x30d0ff, 0.9, -0.7, 0.6, 0.9], [0xff4020, 0.8, 0.9, 0.25, -0.8]], envI: 0.55,
-    lamps: [[0xff9440, 0.65], [0x7fe8ff, 0.35]], flood: 0xbfefff, wet: 0.35, puddle: 0.62, rain: 0, rim: 0x5cc8ff, rimI: 0.55,
+    lamps: [[0xff9440, 0.65], [0x7fe8ff, 0.35]], flood: 0xbfefff, wet: 0.35, puddle: 0.62, rain: 0, shafts: 0.05, rim: 0x5cc8ff, rimI: 0.55,
     tint: [1.06, 0.98, 0.88], shadowTint: [0.82, 0.99, 1.12], exposure: 1.05, contrast: 1.18, sat: 0.92, warmSat: 0.3, lift: [0.006, 0.009, 0.012], lampScale: 1,
   },
   night: {
     name: 'Dead Night', fog: 0x0a1016, fogD: 0.012, haze: 0x1c3038, fogH: [0.14, 0.06], scatter: 0.0012, mist: [0.24, 0.32, 0.38], embers: 0.3, ash: 0,
     sun: 0x86b8f0, sunI: 1.35, sunDir: [0.42, 0.85, -0.5], hemiS: 0x2c5a6c, hemiG: 0x0c0e12, hemiI: 1.05,
     sky: [0x05070a, 0x102028, 0x1c3a48], glows: [[0x20e0ff, 2.2, -0.65, 0.5, -0.6], [0xff8a30, 1.6, -0.3, 0.3, -0.9], [0xff2a70, 1.2, -0.9, 0.55, 0.1], [0x30f0c0, 1.0, 0.6, 0.4, 0.6]], envI: 0.65,
-    lamps: [[0xff8a30, 0.55], [0x70f0e0, 0.45]], flood: 0xa8f0ff, wet: 0.95, puddle: 0.5, rain: 1, rim: 0x48d8ff, rimI: 0.75,
+    lamps: [[0xff8a30, 0.55], [0x70f0e0, 0.45]], flood: 0xa8f0ff, wet: 0.95, puddle: 0.5, rain: 1, shafts: 0.025, rim: 0x48d8ff, rimI: 0.75,
     tint: [1.04, 0.99, 0.92], shadowTint: [0.78, 1.0, 1.16], exposure: 1.25, contrast: 1.16, sat: 0.98, warmSat: 0.35, lift: [0.004, 0.009, 0.012], lampScale: 1.4,
   },
   toxic: {
-    name: 'Toxic Smog', fog: 0x121614, fogD: 0.013, haze: 0x2c3626, fogH: [0.13, 0.1], scatter: 0.001, mist: [0.34, 0.4, 0.28], embers: 0.1, ash: 0,
+    name: 'Toxic Smog', fog: 0x101616, fogD: 0.013, haze: 0x243230, fogH: [0.13, 0.1], scatter: 0.001, mist: [0.34, 0.4, 0.28], embers: 0.1, ash: 0,
     sun: 0xf0d8a0, sunI: 1.15, sunDir: [0.5, 0.78, 0.35], hemiS: 0x2e5260, hemiG: 0x12110e, hemiI: 0.95,
     sky: [0x080a08, 0x1c2418, 0x5a6038], glows: [[0x90ff40, 1.4, -0.6, 0.4, -0.5], [0x20d0c0, 1.3, 0.5, 0.5, -0.7], [0xffa030, 1.2, -0.8, 0.25, 0.5]], envI: 0.55,
-    lamps: [[0xffa040, 0.5], [0x60ffc0, 0.5]], flood: 0xd0ffd8, wet: 0.6, puddle: 0.56, rain: 0.35, rim: 0x60ffd0, rimI: 0.55,
-    tint: [1.06, 1.0, 0.86], shadowTint: [0.8, 0.98, 1.12], exposure: 1.1, contrast: 1.18, sat: 0.8, warmSat: 0.3, lift: [0.006, 0.009, 0.009], lampScale: 1.15,
+    lamps: [[0xffa040, 0.5], [0x60ffc0, 0.5]], flood: 0xd0ffd8, wet: 0.6, puddle: 0.56, rain: 0.35, shafts: 0.045, rim: 0x60ffd0, rimI: 0.55,
+    tint: [1.08, 1.0, 0.84], shadowTint: [0.86, 0.96, 1.16], exposure: 1.25, contrast: 1.2, sat: 0.78, warmSat: 0.3, lift: [0.006, 0.009, 0.009], lampScale: 1.15,
   },
   ash: {
     name: 'Ashfall', fog: 0x1e2024, fogD: 0.012, haze: 0x40444a, fogH: [0.12, 0.2], scatter: 0.0009, mist: [0.45, 0.46, 0.48], embers: 0.25, ash: 1.2,
     sun: 0xe6ecf4, sunI: 1.9, sunDir: [-0.35, 0.86, 0.5], hemiS: 0x4a5a6a, hemiG: 0x18181a, hemiI: 1.0,
     sky: [0x0c0d10, 0x2c3038, 0x7a8088], glows: [[0xff6a20, 1.5, -0.5, 0.2, -0.6], [0x80c8ff, 0.9, 0.6, 0.6, 0.4]], envI: 0.5,
-    lamps: [[0xff9040, 0.7], [0xd8f0ff, 0.3]], flood: 0xe8f4ff, wet: 0.15, puddle: 0.7, rain: 0, rim: 0x9ad0ff, rimI: 0.5,
-    tint: [1.05, 0.99, 0.92], shadowTint: [0.86, 0.96, 1.1], exposure: 1.05, contrast: 1.14, sat: 0.8, warmSat: 0.4, lift: [0.007, 0.008, 0.01], lampScale: 1.1,
+    lamps: [[0xff9040, 0.85], [0x8ad8ff, 0.15]], flood: 0xffd8a8, wet: 0.15, puddle: 0.7, rain: 0, shafts: 0.05, rim: 0x9ad0ff, rimI: 0.5,
+    tint: [1.07, 0.99, 0.88], shadowTint: [0.84, 0.97, 1.12], exposure: 1.05, contrast: 1.16, sat: 0.88, warmSat: 0.4, lift: [0.007, 0.008, 0.01], lampScale: 1.1,
   },
 };
 
@@ -85,6 +85,7 @@ export class Lighting {
     scene.userData.scatterLights = this.pool;
     this.fx = new LightFx(scene, quality);
     this.rain = p.rain > 0 ? new Rain(scene, quality, p.rain) : null;
+    this.shafts = quality !== 'low' && p.shafts > 0 ? new Shafts(scene, quality, this.sunDir, p.sun, p.shafts) : null;
     this.time = 0;
   }
 
@@ -178,5 +179,6 @@ export class Lighting {
     }
     this.fx.update(dt, this.sources, focus, 1.0, 1.0);
     if (this.rain) this.rain.update(dt, focus);
+    if (this.shafts) this.shafts.update(dt, focus);
   }
 }
