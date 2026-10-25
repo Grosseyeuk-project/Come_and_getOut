@@ -15,10 +15,10 @@ const UP_NEG = new V(0, -1, 0);
 const _v1 = new V(), _v2 = new V(), _v3 = new V(), _v4 = new V(), _q = new THREE.Quaternion();
 
 const KINDS = {
-  player: { cloth: 0x4c545c, pants: 0x3a3f44, vest: 0x2a2e33, plate: 0x9aa2a8, skin: 0xa07e66, boots: 0x1a1714, gloves: 0x18191a, accent: 0x38d8ff, eye: 0x38d8ff, scale: 1.22, rim: [0.45, 0.65, 0.8] },
-  raider: { cloth: 0x5a2a18, pants: 0x3a3226, vest: 0x2e241c, plate: 0x6a4a2e, skin: 0x8a6a56, boots: 0x1c1712, gloves: 0x2a1d14, accent: 0xff3a14, eye: 0xff2a10, scale: 1.14, rim: [0.55, 0.2, 0.08] },
-  mutant: { cloth: 0x2e2a22, pants: 0x2b2820, vest: 0x2a2620, plate: 0x3a3a30, skin: 0x8a9478, boots: 0x3b382e, gloves: 0x7a8468, accent: 0xb4ff3a, eye: 0xd4ff30, scale: 1.12, rim: [0.32, 0.48, 0.1] },
-  brute: { cloth: 0x2a221c, pants: 0x2a221c, vest: 0x3a2a20, plate: 0x6a6258, skin: 0x7a6252, boots: 0x2a2018, gloves: 0x3a3430, accent: 0xff6a1a, eye: 0xff8a20, scale: 1.72, rim: [0.6, 0.3, 0.1] },
+  player: { cloth: 0x4c545c, pants: 0x2c3034, vest: 0x2a2e33, plate: 0x9aa2a8, skin: 0xa07e66, boots: 0x1a1714, gloves: 0x18191a, accent: 0x38d8ff, eye: 0x38d8ff, scale: 1.22, rim: [0.35, 0.55, 0.7] },
+  raider: { cloth: 0x5a2a18, pants: 0x3a3226, vest: 0x2e241c, plate: 0x6a4a2e, skin: 0x8a6a56, boots: 0x1c1712, gloves: 0x2a1d14, accent: 0xff3a14, eye: 0xff2a10, scale: 1.14, rim: [0.32, 0.14, 0.07] },
+  mutant: { cloth: 0x2e2a22, pants: 0x2b2820, vest: 0x2a2620, plate: 0x3a3a30, skin: 0x8a9478, boots: 0x3b382e, gloves: 0x7a8468, accent: 0xb4ff3a, eye: 0xd4ff30, scale: 1.12, rim: [0.22, 0.34, 0.08] },
+  brute: { cloth: 0x2a221c, pants: 0x2a221c, vest: 0x3a2a20, plate: 0x6a6258, skin: 0x7a6252, boots: 0x2a2018, gloves: 0x3a3430, accent: 0xff6a1a, eye: 0xff8a20, scale: 1.72, rim: [0.4, 0.22, 0.08] },
 };
 const RAIDER_CLOTH = [0x5a2a18, 0x6a3a1a, 0x4a3a28, 0x5e4a30, 0x3a2e2a, 0x6a2420];
 
@@ -38,7 +38,7 @@ export class Humanoid {
       skin: new THREE.MeshStandardMaterial({ color: K.skin, roughness: 0.6 }),
       boots: new THREE.MeshStandardMaterial({ color: K.boots, roughness: 0.6 }),
       gloves: new THREE.MeshStandardMaterial({ color: K.gloves, roughness: 0.7 }),
-      accent: new THREE.MeshStandardMaterial({ color: 0x000000, emissive: K.accent, emissiveIntensity: 3 }),
+      accent: new THREE.MeshStandardMaterial({ color: 0x000000, emissive: K.accent, emissiveIntensity: kind === 'mutant' ? 1.4 : 3 }),
       eye: new THREE.MeshStandardMaterial({ color: 0x000000, emissive: K.eye, emissiveIntensity: 6 }),
       bone: new THREE.MeshStandardMaterial({ color: 0xc8bca0, roughness: 0.6 }),
       rust: new THREE.MeshStandardMaterial({ color: 0x5a3a26, roughness: 0.8, metalness: 0.4 }),
@@ -60,7 +60,7 @@ export class Humanoid {
 
     // proportions
     const P = this.P = {
-      hipY: mutant ? 0.9 : 0.98, chestW: brute ? 1.55 : mutant ? 0.85 : 1, armR: brute ? 0.1 : mutant ? 0.05 : 0.055,
+      hipY: mutant ? 0.9 : 0.98, chestW: brute ? 1.55 : mutant ? 0.85 : 1, armR: brute ? 0.11 : mutant ? 0.055 : 0.068,
       upper: brute ? 0.33 : mutant ? 0.38 : 0.29, fore: brute ? 0.33 : mutant ? 0.42 : 0.27, shoulderX: brute ? 0.36 : mutant ? 0.22 : 0.23,
       hunch: mutant ? 0.62 : brute ? 0.3 : 0.06,
     };
@@ -170,12 +170,15 @@ export class Humanoid {
       add(this.head, new THREE.BoxGeometry(0.04, 0.12, 0.3), m.rust, 0, 0.16, 0); // crest
     }
     // arms
-    const armR = P.armR, foreR = armR * (brute ? 1.15 : 0.92), armMat = beast ? m.skin : m.cloth;
+    const armR = P.armR, foreR = armR * (brute ? 1.15 : 0.92), bare = kind === 'raider' && rnd() < 0.5, armMat = beast || bare ? m.skin : m.cloth;
     this.arms = [-1, 1].map((sx) => {
       const sh = G(this.chest, sx * P.shoulderX * (brute ? 1.1 : 1), brute ? 0.2 : 0.17, 0);
       add(sh, capsule(armR, P.upper - armR * 1.6), armMat, 0, -P.upper / 2, 0);
       const el = G(sh, 0, -P.upper, 0);
       add(el, capsule(foreR, P.fore - foreR * 1.8), brute ? m.plate : armMat, 0, -P.fore / 2, 0, brute ? 1.15 : 1, 1, brute ? 1.15 : 1);
+      add(el, new THREE.SphereGeometry(armR * 1.05, 8, 6), armMat); // elbow
+      if (bare) for (let i = 0; i < 2; i++) addR(el, new THREE.CylinderGeometry(foreR * 1.18, foreR * 1.18, 0.035, 7), m.cloth2, 0, -P.fore * (0.3 + i * 0.25), 0, 0.2, 0, 0.3 - i * 0.5); // wraps
+      if (kind === 'player' || kind === 'raider') addR(sh, RB(armR * 2.6, 0.12, armR * 2.6, 0.03), kind === 'player' ? m.plate : m.rust, 0, -P.upper * 0.45, 0); // upper-arm guard
       if (!beast) add(el, new THREE.CylinderGeometry(foreR * 1.15, foreR * 1.2, 0.08, 8), m.gloves, 0, -P.fore + 0.07, 0);
       if (kind === 'raider' && rnd() < 0.5) add(el, new THREE.CylinderGeometry(foreR * 1.25, foreR * 1.3, 0.05, 8), m.cloth2, 0, -P.fore * 0.45, 0);
       const hand = add(el, RB(mutant ? 0.09 : brute ? 0.16 : 0.075, mutant ? 0.16 : brute ? 0.16 : 0.1, brute ? 0.1 : 0.05, 0.02, 1), m.gloves, 0, -P.fore - 0.03, 0);
@@ -193,11 +196,13 @@ export class Humanoid {
     const legL = brute ? 0.44 : 0.44;
     this.legs = [-1, 1].map((sx) => {
       const hp = G(this.hips, sx * (brute ? 0.14 : 0.1), -0.06, 0);
-      add(hp, capsule(brute ? 0.1 : mutant ? 0.065 : 0.075, 0.28), m.pants, 0, -0.21, 0);
+      add(hp, capsule(brute ? 0.11 : mutant ? 0.065 : 0.092, 0.26), m.pants, 0, -0.21, 0, 1.05, 1, 1);
+      add(hp, new THREE.SphereGeometry(brute ? 0.1 : mutant ? 0.06 : 0.08, 8, 6), m.pants, 0, -0.42, 0); // knee joint
       const kn = G(hp, 0, -legL, 0);
       if (!beast) add(kn, RB(0.11, 0.1, 0.06, 0.02, 1), kind === 'player' ? m.plate : m.rust, 0, 0, 0.065);
       if (brute) add(kn, RB(0.16, 0.3, 0.16, 0.04), m.plate, 0, -0.16, 0.02);
-      add(kn, capsule(brute ? 0.085 : mutant ? 0.05 : 0.06, 0.3), mutant ? m.skin : m.pants, 0, -0.2, 0);
+      add(kn, capsule(brute ? 0.09 : mutant ? 0.05 : 0.072, 0.28), mutant ? m.skin : m.pants, 0, -0.2, 0);
+      if (!beast) add(kn, new THREE.CylinderGeometry(0.075, 0.085, 0.16, 8), m.boots, 0, -0.36, 0.0); // boot shaft
       const ft = G(kn, 0, -legL, 0);
       add(ft, RB(brute ? 0.16 : 0.11, 0.09, brute ? 0.3 : 0.25, 0.03, 1), mutant ? m.skin : m.boots, 0, 0.0, 0.04);
       if (mutant) for (let i = 0; i < 3; i++) addR(ft, new THREE.ConeGeometry(0.012, 0.06, 3), m.bone, -0.03 + i * 0.03, -0.02, 0.18, Math.PI / 2);
@@ -282,7 +287,7 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
   }
   // opts: { push, gib, headshot, kind }
   die(dirX, dirZ, opts = {}) {
-    this.deathT = 0; this.flash = 1;
+    this.deathT = 0; this.flash = 0.75;
     const l = Math.hypot(dirX, dirZ) || 1; dirX /= l; dirZ /= l;
     this.deathHit = { x: dirX, z: dirZ };
     const push = opts.push ?? 2.5;
@@ -322,9 +327,9 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
 
   // s: { speed, moveX, moveZ (world move dir), rolling, rollP (0..1), reloading, reloadP, pump, crouch, sprint }
   update(dt, s) {
-    this.flash = Math.max(0, this.flash - dt * 7);
+    this.flash = Math.max(0, this.flash - dt * 10);
     const fl = this.flash * this.flash;
-    for (const mt of this.allMats) mt.emissive.setRGB(fl * 1.6, fl * 0.5, fl * 0.3);
+    for (const mt of this.allMats) mt.emissive.setRGB(fl * 0.45, fl * 0.12, fl * 0.08);
     // damped spring flinch (overshoots a little = reads as impact)
     this.flinchV.addScaledVector(this.flinch, -160 * dt).multiplyScalar(Math.exp(-14 * dt));
     this.flinch.addScaledVector(this.flinchV, dt);
@@ -380,10 +385,13 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
     // roll: tucked somersault pivoting around the body centre
     if (s.rolling) {
       const p = clamp(s.rollP, 0, 1), e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
-      const th = e * Math.PI * 2, C = 0.5;
+      const th = e * Math.PI * 2, C = 0.72;
       this.body.rotation.x = th;
-      const tuck = Math.sin(p * Math.PI);
-      this.body.position.set(0, C - C * Math.cos(th) - tuck * 0.32, -C * Math.sin(th));
+      const tuck = Math.min(1, Math.sin(p * Math.PI) * 1.6);
+      // pivot = body-local point at height C; keep it at world height Cw so the tucked ball never sinks
+      const Cw = C - tuck * 0.12;
+      this.body.position.set(0, Cw - C * Math.cos(th), -C * Math.sin(th));
+      this.hips.position.y = this.P.hipY - tuck * 0.3;
       for (const L of this.legs) { L.hp.rotation.x = -1.6 * tuck - 0.2; L.kn.rotation.x = 2.3 * tuck + 0.1; }
       this.spine.rotation.x = 0.2 + tuck * 0.9;
       this.head.rotation.x = tuck * 0.6;

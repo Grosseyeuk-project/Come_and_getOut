@@ -39,8 +39,8 @@ export class Effects {
       scorch: new THREE.MeshStandardMaterial({ map: T.decal('scorch'), transparent: true, depthWrite: false, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }),
     };
     const wetMat = (tex, color, rough = 0.18) => new THREE.MeshStandardMaterial({ map: tex, color, transparent: true, depthWrite: false, roughness: rough, metalness: 0.1, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
-    BLOOD.splatMats = [0, 1, 2].map((v) => wetMat(splatTex(v), 0x6a0808)); BLOOD.poolMat = wetMat(poolTex(), 0x4a0404, 0.08);
-    ICHOR.splatMats = [0, 1, 2].map((v) => wetMat(splatTex(v), 0x5a6a10)); ICHOR.poolMat = wetMat(poolTex(), 0x3a4a08, 0.1);
+    BLOOD.splatMats = [0, 1, 2].map((v) => wetMat(splatTex(v), 0x8a0c0a)); BLOOD.poolMat = wetMat(poolTex(), 0x7a0a08, 0.22);
+    ICHOR.splatMats = [0, 1, 2].map((v) => wetMat(splatTex(v), 0x5a6a10)); ICHOR.poolMat = wetMat(poolTex(), 0x4a5a0a, 0.25);
     this.wetMats = [...BLOOD.splatMats, BLOOD.poolMat, ...ICHOR.splatMats, ICHOR.poolMat];
     this.flashes = [];
     const fg = new THREE.PlaneGeometry(1, 0.5); fg.rotateX(-Math.PI / 2); fg.translate(0.5 - 40 / 256, 0, 0); this.flashGeo = fg;
@@ -58,7 +58,7 @@ export class Effects {
   tracer(x0, y0, z0, x1, y1, z1, color = 0xffc070, width = 0.06, speed = 160) {
     const len = Math.hypot(x1 - x0, y1 - y0, z1 - z0);
     if (!(len > 0.05)) return; // degenerate (point-blank): lookAt/normalise would produce NaN
-    const c = new THREE.Color(color).multiplyScalar(3.2);
+    const c = new THREE.Color(color).multiplyScalar(2.2);
     const m = new THREE.Mesh(this.tracerGeo, new THREE.MeshBasicMaterial({ color: c, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
     m.position.set(x0, y0, z0); m.lookAt(x1, y1, z1);
     const seg = Math.min(len, 6);
@@ -74,7 +74,7 @@ export class Effects {
     fm.position.set(x, y, z); fm.rotation.y = Math.atan2(-dz, dx); fm.rotation.x = (Math.random() - 0.5) * 0.6;
     const fs = (1.1 + Math.random() * 0.6) * scale; fm.scale.set(fs, 1, fs * (0.8 + Math.random() * 0.5)); fm.renderOrder = 8;
     this.scene.add(fm); this.flashes.push({ m: fm, t: 0 });
-    this.star.emit({ x: x + dx * 0.05, y, z: z + dz * 0.05, life: 0.05, s0: 1.1 * scale, s1: 0.6 * scale, c0: [color[0] * 5, color[1] * 5, color[2] * 5, 1], c1: [color[0] * 2, color[1], color[2] * 0.5, 0] });
+    this.star.emit({ x: x + dx * 0.05, y, z: z + dz * 0.05, life: 0.05, s0: 0.75 * scale, s1: 0.4 * scale, c0: [color[0] * 5, color[1] * 5, color[2] * 5, 1], c1: [color[0] * 2, color[1], color[2] * 0.5, 0] });
     for (let i = 0; i < 3; i++) this.add.emit({ x: x + dx * 0.12 * i, y, z: z + dz * 0.12 * i, vx: dx * (3 + i * 3), vz: dz * (3 + i * 3), life: 0.06, s0: (0.7 - i * 0.15) * scale, s1: 0.12, c0: [color[0] * 4, color[1] * 4, color[2] * 4, 1], c1: [color[0], color[1] * 0.5, 0.1, 0] });
     const ns = Math.round(5 * scale);
     for (let i = 0; i < ns; i++) {
@@ -82,7 +82,7 @@ export class Effects {
       this.streaks.emit({ x, y, z, vx: (dx * ca - dz * sa) * sp, vy: (Math.random() - 0.3) * 3, vz: (dx * sa + dz * ca) * sp, life: 0.05 + Math.random() * 0.08, trail: 0.02, w: 0.018, c0: [5, 3.2, 1.2, 1], c1: [2, 0.6, 0.1, 0], grav: 2, drag: 4 });
     }
     this.smoke.emit({ x: x + dx * 0.25, y, z: z + dz * 0.25, vx: dx * 1.6, vy: 0.5, vz: dz * 1.6, life: 0.9, s0: 0.3 * scale, s1: 1.3 * scale, c0: [0.55, 0.53, 0.5, 0.3], c1: [0.5, 0.5, 0.5, 0], drag: 2.2 });
-    this.flashLight(x + dx * 0.3, y + 0.25, z + dz * 0.3, 0xffa850, 70 * scale, 13 * Math.sqrt(scale), 0.055);
+    this.flashLight(x + dx * 0.3, y + 0.25, z + dz * 0.3, 0xffa850, 45 * scale, 12 * Math.sqrt(scale), 0.055);
   }
 
   flashLight(x, y, z, color, intensity, range, ttl) {
@@ -145,10 +145,10 @@ export class Effects {
   // Flesh hit: exit spray in the bullet direction (mist + droplets + splat on the ground), small entry puff.
   bloodHit(x, y, z, bx, bz, B = BLOOD, power = 1) {
     const P = Math.min(2.5, power);
-    const nd = Math.round(10 * P);
+    const nd = Math.round(16 * P);
     for (let i = 0; i < nd; i++) {
       const sp = 2 + Math.random() * 5;
-      this.wet.emit({ x, y, z, vx: (bx + (Math.random() - 0.5) * 1.1) * sp, vy: (Math.random() - 0.1) * 3.2, vz: (bz + (Math.random() - 0.5) * 1.1) * sp, life: 0.5 + Math.random() * 0.4, s0: 0.07 + Math.random() * 0.08, s1: 0.04, c0: B.drop, c1: B.dropEnd, grav: 13, floor: 0.04, drag: 0.6 });
+      this.wet.emit({ x, y, z, vx: (bx + (Math.random() - 0.5) * 1.1) * sp, vy: (Math.random() - 0.1) * 3.2, vz: (bz + (Math.random() - 0.5) * 1.1) * sp, life: 0.5 + Math.random() * 0.4, s0: 0.1 + Math.random() * 0.12, s1: 0.05, c0: B.drop, c1: B.dropEnd, grav: 13, floor: 0.04, drag: 0.6 });
     }
     // mist cloud
     for (let i = 0; i < 3; i++) this.wet.emit({ x: x + bx * 0.15, y, z: z + bz * 0.15, vx: bx * (1.5 + Math.random() * 2) + (Math.random() - 0.5), vy: Math.random() * 0.8, vz: bz * (1.5 + Math.random() * 2) + (Math.random() - 0.5), life: 0.35 + Math.random() * 0.25, s0: 0.25, s1: 0.9 + P * 0.25, c0: B.mist, c1: B.mistEnd, drag: 4 });
@@ -206,9 +206,15 @@ export class Effects {
     this.flashLight(x, y + 1, z, 0xff8030, 120, 16, 0.25);
   }
 
-  dustRing(x, z, r = 2.5) { // melee slam / heavy landing
-    for (let i = 0; i < 22; i++) { const a = (i / 22) * 6.28; this.smoke.emit({ x: x + Math.cos(a) * 0.4, y: 0.2, z: z + Math.sin(a) * 0.4, vx: Math.cos(a) * r * 2, vy: 0.4, vz: Math.sin(a) * r * 2, life: 1.0, s0: 0.5, s1: 1.6, c0: [0.45, 0.42, 0.38, 0.5], c1: [0.4, 0.4, 0.38, 0], drag: 3.5 }); }
+  dustRing(x, z, r = 2.5) { // melee slam / heavy landing / dodge: irregular billow + grit
+    const n = Math.round(10 + r * 6);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * 6.28 + Math.random() * 0.5, sp = r * (0.8 + Math.random() * 1.6);
+      this.smoke.emit({ x: x + Math.cos(a) * 0.3, y: 0.15 + Math.random() * 0.2, z: z + Math.sin(a) * 0.3, vx: Math.cos(a) * sp, vy: 0.2 + Math.random() * 0.6, vz: Math.sin(a) * sp, life: 0.7 + Math.random() * 0.7, s0: 0.3 + Math.random() * 0.4, s1: 1.0 + Math.random() * 1.0 + r * 0.2, c0: [0.5, 0.47, 0.42, 0.42], c1: [0.42, 0.4, 0.38, 0], drag: 3.5 });
+    }
+    if (r > 1.5) for (let i = 0; i < r * 5; i++) { const a = Math.random() * 6.28, sp = 2 + Math.random() * 4; this.chunks.emit({ x, y: 0.1, z, vx: Math.cos(a) * sp, vy: 2 + Math.random() * 4, vz: Math.sin(a) * sp, s: 0.04 + Math.random() * 0.06, life: 5, color: CHIP[(Math.random() * CHIP.length) | 0] }); }
   }
+
 
   update(dt, focus, camera) {
     this.time += dt;
@@ -279,7 +285,7 @@ function mergeTwo(a, b) { return mergeGeometries([a, b], false); }
 function flashTexture() { return T.softSprite('flash', 1, 0); }
 
 // gore palettes (linear colours; droplets are unlit sprites so keep them saturated enough to read)
-const BLOOD = { drop: [0.5, 0.025, 0.02, 1], dropEnd: [0.28, 0.01, 0.01, 0.9], mist: [0.42, 0.03, 0.03, 0.55], mistEnd: [0.25, 0.01, 0.01, 0], glint: [1.6, 0.25, 0.15, 1], gib: [0x7a1410, 0x5a0c0a, 0x8a2a20, 0x9a7a6a] };
+const BLOOD = { drop: [0.85, 0.05, 0.03, 1], dropEnd: [0.45, 0.02, 0.01, 0.9], mist: [0.6, 0.05, 0.04, 0.6], mistEnd: [0.25, 0.01, 0.01, 0], glint: [2.2, 0.3, 0.15, 1], gib: [0x7a1410, 0x5a0c0a, 0x8a2a20, 0x9a7a6a] };
 const ICHOR = { drop: [0.38, 0.45, 0.05, 1], dropEnd: [0.18, 0.22, 0.02, 0.9], mist: [0.3, 0.38, 0.06, 0.5], mistEnd: [0.15, 0.2, 0.02, 0], glint: [1.2, 1.6, 0.2, 1], gib: [0x4a5a14, 0x3a3a10, 0x6a7a2a, 0x8a8a6a] };
 const CHIP = [0x6a6660, 0x5a5650, 0x7a746a, 0x4a4640, 0x807a70];
 const WOODC = [0x5a3a20, 0x6a4628, 0x4a2e18, 0x7a5432, 0x3a2414];

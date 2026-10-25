@@ -63,7 +63,7 @@ function mats() {
   modelMats.poly = new THREE.MeshStandardMaterial({ color: 0x2c2b28, roughness: 0.8, metalness: 0.1 });
   modelMats.wood = new THREE.MeshStandardMaterial({ color: 0x4a2f1c, roughness: 0.7 });
   modelMats.glass = new THREE.MeshStandardMaterial({ color: 0x102030, roughness: 0.05, metalness: 0.5, emissive: 0x0a2030 });
-  for (const r of RARITIES) modelMats['acc_' + r.key] = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: r.hex, emissiveIntensity: 2.5 });
+  for (const r of RARITIES) modelMats['acc_' + r.key] = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: r.hex, emissiveIntensity: 1.1 });
   return modelMats;
 }
 const modelCache = {};

@@ -36,7 +36,7 @@ export class Combat {
       const range = s.range * (shotgun ? 0.85 + Math.random() * 0.3 : 1);
       const r = this.trace(sx, sz, dx, dz, range, s.dmg, s.crit, B.pierce || 0, s.range, shotgun ? 0.55 : w.base === 'dmr' ? 1.8 : 1);
       if (r.hit) anyHit = true; if (r.kill) kill = true;
-      g.fx.tracer(m.x, m.y, m.z, r.x, r.y, r.z, shotgun ? 0xffa050 : w.base === 'dmr' ? 0xfff0c0 : 0xffd090, shotgun ? 0.04 : w.base === 'dmr' ? 0.09 : 0.06, shotgun ? 150 : 190);
+      g.fx.tracer(m.x, m.y, m.z, r.x, r.y, r.z, shotgun ? 0xffa050 : w.base === 'dmr' ? 0xfff0c0 : 0xffd090, shotgun ? 0.03 : w.base === 'dmr' ? 0.06 : 0.04, shotgun ? 150 : 190);
     }
     // shotgun knockback: proportional to pellets that connected
     for (const [e, h] of this.shot) {
