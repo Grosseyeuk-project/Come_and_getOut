@@ -102,7 +102,7 @@ function fillBlock(L, b, rng) {
         const f = { x0: lt.x0 + ins(), x1: lt.x1 - ins(), z0: lt.z0 + ins(), z1: lt.z1 - ins() };
         L.buildings.push({
           ...f,
-          floors: b.edge ? rng.int(3, 6) : rng.weighted(L.themeDef.floors),
+          floors: b.edge ? (f.x1 > HALF - 4 || f.z1 > HALF - 4 ? rng.int(1, 2) : rng.int(3, 6)) : rng.weighted(L.themeDef.floors), // camera-side edge stays low
           style: rng.weighted(L.themeDef.styles),
           tint: rng.pick([0xffffff, 0xf0e6d8, 0xd8dcd8, 0xe8d0c0, 0xc8c0b0, 0xdcd4bc, 0xbfc8cc]),
           damage: b.type === 'collapsed' ? 1 : rng.range(0.15, 0.85),
@@ -322,7 +322,7 @@ function buildOuterRing(L, rng) {
       const lot = alongX ? { x0: x0 + t, x1: x0 + t + lw, z0, z1 } : { x0, x1, z0: z0 + t, z1: z0 + t + lw };
       t += lw + rng.range(0, 1.2);
       let floors;
-      if (near) floors = dist < 14 ? rng.weighted([[0, 3], [1, 3], [2, 2]]) : rng.int(1, 4);
+      if (near) floors = dist < 16 ? -1 : rng.weighted([[-1, 2], [1, 2], [2, 1]]); // -1: low ruin lot (walls stumps, rubble), keeps the camera side open
       else floors = rng.weighted([[3, 1], [4, 2], [5, 3], [7, 3], [9, 2], [12, 1]]) + (dist > 20 ? rng.int(0, 3) : 0);
       L.outer.push({ ...lot, floors, style: rng.weighted(L.themeDef.styles), tint: rng.pick([0xffffff, 0xe8e0d4, 0xd0d4d8, 0xc8bcb0, 0xb8b0a4]), broken: rng.chance(0.45), near, seed: rng.int(1, 1e9) });
     }

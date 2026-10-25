@@ -65,6 +65,7 @@ export class Environment {
     this.debris = new Scatter(M.wood, [box1(1.2, 0.04, 0.15), box1(0.8, 0.03, 0.2), box1(1.6, 0.05, 0.1)]);
     this.rebar = new Scatter(M.rebar, [cyl1(0.012, 1)], false);
     this.litter = new Scatter(M.paper, [paperGeo(0), paperGeo(1), paperGeo(2)], false);
+    this.pebbles = new Scatter(M.rubble, [0, 1, 2].map((i) => pebbleGeo(300 + i)), false); // tiny chunks: low poly, no shadow
     this.shards = new Scatter(M.carGlass, [shardGeo()], false);
     this.cans = new Scatter(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0.6 }), [canGeo(), bottleGeo()], false);
     this.signs = []; // emissive signage {pos, color, flicker, seed, dead}: lighting can pair lights with these
@@ -91,7 +92,7 @@ export class Environment {
     const emiss = new Set([M.neon, M.bulb, M.bulbCold, M.lampOn, M.redLight, M.facade_concrete, M.facade_brick, M.facade_plaster]);
     for (const m of [...far, ...near]) if (emiss.has(m.material)) this.emissiveMeshes.push(m);
     this.rubble.build(this.root); this.bricks.build(this.root); this.debris.build(this.root); this.rebar.build(this.root);
-    this.litter.build(this.root); this.cans.build(this.root); this.shards.build(this.root);
+    this.litter.build(this.root); this.cans.build(this.root); this.shards.build(this.root); this.pebbles.build(this.root);
     this.buildGrass();
   }
 
@@ -190,7 +191,7 @@ export class Environment {
       return H * (1 - k);
     };
     // floor slab
-    this.addBox(M.concrete, (b.x0 + b.x1) / 2, 0.06, (b.z0 + b.z1) / 2, w, 0.12, d, 0, b.collapsed ? 0x6e6a64 : 0x8e8a84, 0.25);
+    this.addBox(M.slab, (b.x0 + b.x1) / 2, 0.06, (b.z0 + b.z1) / 2, w, 0.12, d, 0, b.collapsed ? 0x6e6a64 : 0x8e8a84, 0.25);
     for (let i = 0; i < Math.ceil(w * d / 40); i++) this.decals.push({ kind: rng.pick(['dirt', 'stain', 'crack', 'paper']), x: rng.range(b.x0 + 1, b.x1 - 1), z: rng.range(b.z0 + 1, b.z1 - 1), s: rng.range(2, 4.5), rot: rng.range(0, 6) });
     this.setH(b.x0, b.z0, b.x1, b.z1, 0.12);
     // openings: breaches + doors
@@ -436,6 +437,15 @@ export class Environment {
         const t = rng.range(2, S.len - 2.5), fl = Math.floor(Math.min(...S.bays.filter((bb) => Math.abs((bb.t0 + bb.t1) / 2 - t) < 3).map((bb) => bb.top), H) / FH);
         if (fl >= 2) this.onWall(S, K.fireEscapeParts(fl, 3.2, rng), t, 0, 0.02);
       }
+      // utility conduit run along the facade with brackets and drops (industrial look)
+      if (street && S.len > 6 && rng.chance(b.style === 'brick' ? 0.35 : 0.25)) {
+        const y = rng.range(2.9, 3.4), t0 = rng.range(0.6, 2), t1 = S.len - rng.range(0.6, 2), r = rng.range(0.05, 0.09);
+        const parts = [{ mat: M.kitMetal, geo: colorize(K.cyl(r, r, t1 - t0, 6, 0, 0, 0.16, 0, 0, Math.PI / 2).toNonIndexed(), 0x7a7a72) }];
+        for (let t = 0; t <= t1 - t0; t += 1.6) parts.push({ mat: M.kitRust, geo: colorize(K.box(0.05, 0.16, 0.18, (t0 + t1) / 2 - t0 - t, 0, 0.08).toNonIndexed(), 0xffffff) });
+        if (rng.chance(0.6)) parts.push({ mat: M.kitMetal, geo: colorize(K.cyl(r, r, y, 6, rng.range(-1, 1) * (t1 - t0) / 2, -y / 2, 0.16).toNonIndexed(), 0x7a7a72) });
+        if (rng.chance(0.5)) parts.push({ mat: M.kitMetal, geo: colorize(K.box(0.5, 0.6, 0.22, rng.range(-1, 1) * (t1 - t0) / 3, -0.6, 0.12).toNonIndexed(), 0x8a8a80) }); // junction box
+        this.onWall(S, parts, (t0 + t1) / 2, y, 0);
+      }
       // drain pipe on one corner
       if (rng.chance(0.45)) { const h = Math.min(H, S.bays[0] ? S.bays[0].top : H); if (h > 3) this.onWall(S, K.drainpipeParts(h - 0.2), 0.55, 0, 0); }
       // hanging cables between facades: register anchors on street sides
@@ -578,7 +588,7 @@ export class Environment {
       case 'debrisField': {
         const s2 = p.s || 3;
         for (let i = 0; i < 26 * s2; i++) { const a = rng.range(0, 6.28), r = Math.sqrt(rng.next()) * s2; const x = p.x + Math.cos(a) * r, z = p.z + Math.sin(a) * r * rng.range(0.6, 1); const k = rng.next();
-          if (k < 0.35) this.rubble.add(x, 0.02, z, rng.range(0.05, 0.22), rng.range(0, 3), rng.range(0, 3), 0);
+          if (k < 0.35) (k < 0.25 ? this.pebbles : this.rubble).add(x, 0.02, z, rng.range(0.05, 0.22), rng.range(0, 3), rng.range(0, 3), 0);
           else if (k < 0.55) this.bricks.add(x, 0.04, z, 1, rng.range(-0.3, 0.3), rng.range(0, 6), rng.range(-0.3, 0.3));
           else if (k < 0.85) this.litter.add(x, 0.015, z, rng.range(0.7, 1.4), rng.range(-0.1, 0.1), rng.range(0, 6.3), 0, rng.pick([0xd8d0bc, 0xb8b0a0, 0x9a9488]));
           else if (k < 0.95) this.debris.add(x, 0.03, z, 1, rng.range(-0.1, 0.1), rng.range(0, 6), rng.range(-0.1, 0.1));
@@ -704,7 +714,7 @@ export class Environment {
       const x = rng.range(-HALF, HALF), z = rng.range(-HALF, HALF);
       if (this.col.blockedCircle(x, z, 0.2, 0.2)) continue;
       const big = rng.chance(0.15);
-      this.rubble.add(x, this.heightAt(x, z) + 0.01, z, big ? rng.range(0.12, 0.25) : rng.range(0.04, 0.1), rng.range(0, 3), rng.range(0, 3), rng.range(0, 3));
+      (big ? this.rubble : this.pebbles).add(x, this.heightAt(x, z) + 0.01, z, big ? rng.range(0.12, 0.25) : rng.range(0.04, 0.1), rng.range(0, 3), rng.range(0, 3), rng.range(0, 3));
     }
     for (let i = 0; i < 500; i++) { const x = rng.range(-HALF, HALF), z = rng.range(-HALF, HALF); if (!this.col.blockedCircle(x, z, 0.2, 0.2)) this.bricks.add(x, this.heightAt(x, z) + 0.035, z, 1, 0, rng.range(0, 6), 0); }
     // paper litter, cans, bottles: biased toward curbs and walls via a density noise
@@ -827,6 +837,26 @@ export class Environment {
     const M = this.M, L = this.L;
     for (const o of L.outer || []) {
       const rng = new RNG(o.seed), w = o.x1 - o.x0, d = o.z1 - o.z0;
+      if (o.floors < 0) { // low ruin: broken wall stumps on the lot outline, rubble, overgrowth
+        const mat = o.style === 'brick' ? M.brickWall : o.style === 'plaster' ? M.plasterWall : M.concreteWall;
+        const ins = 0.8, x0 = o.x0 + ins, x1 = o.x1 - ins, z0 = o.z0 + ins, z1 = o.z1 - ins;
+        for (const [ax, az, bx, bz] of [[x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]]) {
+          const len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(len / 1.6));
+          for (let i = 0; i < n; i++) {
+            if (rng.chance(0.3)) continue;
+            const t = (i + 0.5) / n, h = rng.range(0.3, 2.4), along = Math.abs(bx - ax) > 0.1;
+            this.addBox(mat, ax + (bx - ax) * t, h / 2, az + (bz - az) * t, along ? len / n + 0.02 : 0.38, h, along ? 0.38 : len / n + 0.02, 0, o.tint, 0.33, 0, 0, Math.min(h * 0.6, 0.8), true);
+          }
+        }
+        const cx = (o.x0 + o.x1) / 2, cz = (o.z0 + o.z1) / 2;
+        const g = rockGeo(o.seed % 997, 1); g.scale(w * 0.3, rng.range(0.8, 1.8), d * 0.3); g.translate(cx, -0.4, cz); boxUV(g, 0.3); this.batch.add(M.rubble, g);
+        for (let i = 0; i < w * d / 6; i++) this.rubble.add(rng.range(o.x0, o.x1), 0.05, rng.range(o.z0, o.z1), rng.range(0.1, 0.5), rng.range(0, 3), rng.range(0, 3), 0);
+        for (let i = 0; i < w * d / 10; i++) this.bricks.add(rng.range(o.x0, o.x1), 0.05, rng.range(o.z0, o.z1), 1, rng.range(-0.3, 0.3), rng.range(0, 6), 0);
+        if (rng.chance(0.6)) this.place(P.deadTreeParts(rng, rng.range(0.8, 1.3), rng.chance(0.3)), cx + rng.range(-w / 3, w / 3), 0, cz + rng.range(-d / 3, d / 3), rng.range(0, 6));
+        for (let i = 0; i < 3; i++) this.place(P.bushParts(rng, rng.range(0.7, 1.3)), rng.range(o.x0 + 1, o.x1 - 1), 0, rng.range(o.z0 + 1, o.z1 - 1), 0);
+        if (rng.chance(0.3)) this.place(P.carParts(rng.pick([0, 3, 1]), rng.int(0, 8), true), cx + rng.range(-2, 2), -0.1, cz + rng.range(-2, 2), rng.range(0, 6));
+        continue;
+      }
       if (o.floors === 0) { // empty lot: rubble mound + dead trees + fence
         const cx = (o.x0 + o.x1) / 2, cz = (o.z0 + o.z1) / 2;
         const g = rockGeo(o.seed % 997, 1); g.scale(w * 0.35, rng.range(1, 2.5), d * 0.35); g.translate(cx, -0.4, cz); boxUV(g, 0.3); this.batch.add(M.rubble, g);
@@ -860,7 +890,11 @@ export class Environment {
           else if (k < 0.5) this.place(K.roofVentParts(rng), x, H, z, rng.range(0, 6));
           else if (k < 0.65) this.place(K.acUnitParts(), x, H + 0.3, z, rng.range(0, 6));
           else if (k < 0.78) this.addBox(M.concreteWall, x, H + 1.2, z, rng.range(2, 4), 2.4, rng.range(2, 3.5), rng.pick([0, Math.PI / 2]), o.tint, 0.33, 0, 0, 0, true); // stair hut
-          else if (k < 0.9) { const g = K.box(rng.range(1.2, 2.4), 0.12, rng.range(1.2, 2.4), x, H + 0.06, z); this.batch.add(M.windowLit, colorize(g.toNonIndexed(), new THREE.Color(rng.pick([0xffa050, 0x80b0ff, 0xffd090])).multiplyScalar(rng.range(0.3, 0.7)))); }
+          else if (k < 0.9) { // skylight: dim glow under a mullion grid
+            const a = rng.range(1, 1.6), c = rng.range(1, 1.6);
+            this.batch.add(M.windowLit, colorize(K.box(a, 0.1, c, x, H + 0.05, z).toNonIndexed(), new THREE.Color(rng.pick([0xffa050, 0x80b0ff, 0xffd090])).multiplyScalar(rng.range(0.12, 0.3))));
+            for (let q = -1; q <= 1; q++) { this.batch.add(M.frame, colorize(K.box(a + 0.1, 0.08, 0.06, x, H + 0.12, z + q * c / 2).toNonIndexed(), 0xffffff)); this.batch.add(M.frame, colorize(K.box(0.06, 0.08, c + 0.1, x + q * a / 2, H + 0.12, z).toNonIndexed(), 0xffffff)); }
+          }
           else this.decals.push({ kind: 'puddle', x, z, s: rng.range(2, 4), rot: rng.range(0, 6), y: H });
         }
         if (fl >= 6 && rng.chance(0.7)) { // antenna mast with a red aviation beacon
@@ -1042,6 +1076,7 @@ function extractTop(g) { // move +y-facing triangles out of g into a new geometr
   return tp;
 }
 function paperGeo(k) { const g = new THREE.PlaneGeometry(k === 2 ? 0.5 : 0.28, k === 1 ? 0.36 : 0.22, 2, 1); g.rotateX(-Math.PI / 2); const p = g.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, Math.abs(p.getX(i)) * 0.15 * (k + 1) * 0.5); g.computeVertexNormals(); return g.toNonIndexed(); }
+function pebbleGeo(seed) { const g = new THREE.OctahedronGeometry(1, 0); const r = new RNG(seed), p = g.attributes.position, sx = r.range(0.7, 1.3), sz = r.range(0.7, 1.3); g.rotateY(r.range(0, 1)); for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) * sx, p.getY(i) * 0.6, p.getZ(i) * sz); const ng = g.index ? g.toNonIndexed() : g; ng.computeVertexNormals(); boxUV(ng, 0.5); return ng; }
 function shardGeo() { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0.07, 0, 0.02, 0.02, 0, 0.08], 3)); g.computeVertexNormals(); g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1], 2)); return g; }
 function canGeo() { const g = new THREE.CylinderGeometry(0.035, 0.035, 0.12, 7); g.rotateZ(Math.PI / 2); return g.toNonIndexed(); }
 function bottleGeo() { const g = new THREE.CylinderGeometry(0.02, 0.04, 0.26, 7); g.rotateZ(Math.PI / 2); return g.toNonIndexed(); }

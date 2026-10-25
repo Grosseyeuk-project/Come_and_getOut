@@ -686,12 +686,18 @@ export function shutter() {
 // Rooftop tar / gravel
 export function roofing() {
   if (cache.roofing) return cache.roofing;
-  const S = 256;
+  const S = 512, rng = new RNG(245);
+  const seams = crackMask(S, rng, 10, 2.2, 50);
   cache.roofing = genPBR(S, (u, v, x, y, o) => {
-    const n = tn(u, v, 4, 4, 241), f = hash2(x, y, 242), p = vnoise(u * 48, v * 48, 243, 48);
-    const wet = tn(u, v, 2, 3, 244) > 0.62;
-    const b = 0.13 + n * 0.08 + (p > 0.7 ? 0.08 : 0) + (f - 0.5) * 0.04;
-    o.r = b; o.g = b * 0.98; o.b = b * 0.95; o.h = 0.4 + p * 0.4; o.ro = wet ? 0.25 : 0.92;
+    const i = y * S + x;
+    const n = tn(u, v, 4, 4, 241), f = hash2(x, y, 242), p = vnoise(u * 96, v * 96, 243, 96);
+    const sheet = (Math.abs(((u * 3) % 1) - 0.5) < 0.004 || Math.abs(((v * 2) % 1) - 0.5) < 0.004) ? 1 : 0; // membrane overlaps
+    const patch = tn(u, v, 3, 3, 246) > 0.64 ? 1 : 0;
+    const wet = tn(u, v, 2, 3, 244) > 0.66;
+    let b = 0.09 + n * 0.06 + (p > 0.72 ? 0.05 : 0) + (f - 0.5) * 0.03 - patch * 0.035 - sheet * 0.03 - seams[i] * 0.05;
+    const moss = clamp((tn(u, v, 5, 3, 247) - 0.6) * 3, 0, 1);
+    o.r = b * (1 - moss * 0.3); o.g = b * 0.98 + moss * 0.015; o.b = b * 0.94 * (1 - moss * 0.4);
+    o.h = 0.4 + p * 0.35 + sheet * 0.3 - seams[i] * 0.4; o.ro = wet ? 0.45 : 0.95 - patch * 0.15;
   }, 2.0);
   return cache.roofing;
 }
