@@ -104,6 +104,8 @@ export function materials() {
   M.grass = foliage(new THREE.MeshStandardMaterial({ map: T.grassCard(), alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.95, color: 0xffffff }));
   M.leaves = foliage(new THREE.MeshStandardMaterial({ map: T.leafCard(), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.9, color: 0xffffff }));
   M.vines = foliage(applyCutout(new THREE.MeshStandardMaterial({ map: T.vineCard(), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.9, color: 0xffffff })));
+  M.graffiti = applyCutout(new THREE.MeshStandardMaterial({ map: T.graffitiAtlas(), transparent: true, depthWrite: false, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  M.trim = applyCutout(std(T.concrete(), { normalScale: 0.5, extra: { vertexColors: true, color: 0xb0aca4 } }));
   M.bark = new THREE.MeshStandardMaterial({ color: 0x2a2219, roughness: 1 });
   return M;
 }

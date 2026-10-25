@@ -9,6 +9,7 @@ const SIDEWALK = 2.4;
 
 export function generateLayout(seed) {
   const rng = new RNG(seed);
+  const forced = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('palette') : null;
   const L = { seed, half: HALF, palette: rng.pick(Object.keys(PALETTES)), roads: [], sidewalks: [], blocks: [], buildings: [], props: [], decals: [], lamps: [], grassAreas: [], poles: [] };
 
   const mk = (r) => {
@@ -21,6 +22,7 @@ export function generateLayout(seed) {
   for (const r of rx) L.roads.push({ axis: 'z', x: r.p, w: r.w, z0: -HALF, z1: HALF });
   for (const r of rz) L.roads.push({ axis: 'x', z: r.p, w: r.w, x0: -HALF, x1: HALF });
   L.roadsX = rx; L.roadsZ = rz;
+  if (forced && PALETTES[forced]) L.palette = forced;
 
   const intervals = (roads) => {
     const iv = []; let a = -HALF - 6;
@@ -196,7 +198,7 @@ function decorateRoads(L, rng) {
     // lamps along sidewalks
     for (let a = s.a + rng.range(2, 6); a < s.b - 2; a += rng.range(13, 18)) {
       const side = rng.sign(); const p = at(s, a, side * (s.w / 2 + 0.8));
-      P.push({ type: 'lamp', ...p, rot: rotAlong(s) + (side > 0 ? Math.PI : 0) + Math.PI / 2, working: rng.chance(0.55), bent: rng.chance(0.2), axis: s.axis, side });
+      P.push({ type: 'lamp', ...p, rot: rotAlong(s) + (side > 0 ? Math.PI : 0) + Math.PI / 2, working: rng.chance(0.62), bent: rng.chance(0.2), axis: s.axis, side });
     }
     // utility poles + sagging wires along one side
     if (rng.chance(0.5)) {
@@ -204,6 +206,10 @@ function decorateRoads(L, rng) {
       for (let a = s.a + 3; a < s.b - 2; a += rng.range(11, 15)) line.push({ ...at(s, a, side * (s.w / 2 + 1.9)), lean: rng.range(-0.08, 0.08), broken: rng.chance(0.12) });
       if (line.length > 1) L.poles.push(line);
     }
+    // practical light sources: trash fires, road flares (key for the dark mood)
+    if (rng.chance(0.38)) { const side = rng.sign(); const p = at(s, rng.range(s.a + 2, s.b - 2), side * (s.w / 2 + rng.range(-0.6, 1.2))); P.push({ type: 'barrel', ...p, burning: true }); }
+    if (rng.chance(0.22)) { const p = at(s, rng.range(s.a + 2, s.b - 2), rng.range(-s.w / 2 + 1, s.w / 2 - 1)); P.push({ type: 'flare', ...p, rot: rng.range(0, 6.28) }); }
+    if (rng.chance(0.12)) { const p = at(s, rng.range(s.a + 2, s.b - 2), rng.range(-s.w / 2 + 1, s.w / 2 - 1)); P.push({ type: 'fire', ...p, s: rng.range(0.7, 1.1), campfire: false, debris: true }); }
     // sidewalk clutter
     for (let i = 0; i < Math.ceil(len / 12); i++) {
       const side = rng.sign(); const p = at(s, rng.range(s.a + 1, s.b - 1), side * (s.w / 2 + rng.range(0.6, 2)));

@@ -6,6 +6,7 @@ import { materials, boxUV, colorize, GeoBatch } from '../render/materials.js';
 import * as T from '../render/textures.js';
 import * as P from './props.js';
 import { HALF } from './mapgen.js';
+import { Volumetrics } from '../fx/volumetrics.js';
 
 const FH = 3.3, WT = 0.38, PW = 0.45;
 export const worldUniforms = { uTime: { value: 0 } };
@@ -49,6 +50,9 @@ export class Environment {
     this.batch = new GeoBatch();
     this.fires = [];
     this.smokes = [];
+    this.vol = new Volumetrics(scene);
+    this.flares = [];
+    this.decals = layout.decals;
     this.rng = new RNG(layout.seed ^ 0xabc);
     const M = this.M;
     // height field (for sidewalks / floors)
@@ -216,6 +220,7 @@ export class Environment {
             piece(a, c, yb, Math.min(sill, yc));
             if (inset > 0.1 && yc > sill) { piece(a, a + inset, sill, Math.min(lintel, yc)); piece(c - inset, c, sill, Math.min(lintel, yc)); }
             if (yc > lintel) piece(a, c, lintel, yc);
+            if (yc > sill + 0.3) this.trim(S, ux, uz, nx, nz, a - 0.05, c + 0.05, sill - 0.07, sill + 0.02, 0.1);
           } else piece(a, c, yb, yc);
         }
         // broken jagged top + rebar
@@ -226,6 +231,10 @@ export class Environment {
           // fallen chunks at base outside
           if (rng.chance(0.5)) for (let i = 0; i < 3; i++) { const t = rng.range(t0, t1), o = rng.range(0.4, 1.8); this.rubble.add(S.ax + ux * t + nx * o, 0.05, S.az + uz * t + nz * o, rng.range(0.15, 0.45), rng.range(0, 3), rng.range(0, 3), 0); }
         }
+        // floor cornice bands on intact spans
+        for (let f = 1; f * FH < top - 0.3; f++) this.trim(S, ux, uz, nx, nz, t0, t1, f * FH - 0.12, f * FH + 0.06, 0.12);
+        // graffiti on street level
+        if (rng.chance(0.12) && top > 2.6 && !isDoor) this.graffiti(S, ux, uz, nx, nz, (t0 + t1) / 2, rng.range(0.9, 1.6), rng.range(1.8, 2.6), rng.int(0, 7));
         // vines
         if (rng.chance(0.18)) {
           const vh = Math.min(top, rng.range(2, 6)), vg = new THREE.PlaneGeometry(bw * 0.95, vh);
@@ -285,6 +294,20 @@ export class Environment {
     }
   }
 
+  trim(S, ux, uz, nx, nz, t0, t1, y0, y1, out) {
+    const tc = (t0 + t1) / 2, cx = S.ax + ux * tc + nx * (out / 2 - 0.02), cz = S.az + uz * tc + nz * (out / 2 - 0.02);
+    const alongX = Math.abs(ux) > 0.5, len = t1 - t0;
+    this.addBox(this.M.trim, cx, (y0 + y1) / 2, cz, alongX ? len : out, y1 - y0, alongX ? out : len, 0, 0xffffff, 0.5);
+  }
+  graffiti(S, ux, uz, nx, nz, t, y, w, cell) {
+    const g = new THREE.PlaneGeometry(w, w * 0.62);
+    const u0 = (cell % 4) / 4, v0 = cell < 4 ? 0.5 : 0, uv = g.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) * 0.25, v0 + uv.getY(i) * 0.5);
+    g.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.atan2(nx, nz)));
+    g.translate(S.ax + ux * t + nx * 0.035, y + w * 0.31, S.az + uz * t + nz * 0.035);
+    this.batch.add(this.M.graffiti, g);
+  }
+
   wallSeg(mat, x0, z0, x1, z1, h, tint) {
     const len = Math.hypot(x1 - x0, z1 - z0); if (len < 0.3) return;
     const alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0);
@@ -333,7 +356,9 @@ export class Environment {
         col.add(p.x, p.z, 0.15, 0.15, 0, 6, { kind: 'pole' });
         if (p.working) {
           const c = Math.cos(rot), s = Math.sin(rot); const lx = p.bent ? 1.2 : 1.55, ly = p.bent ? 5.2 : 5.9;
-          this.lighting.addSource(new THREE.Vector3(p.x + c * lx, ly, p.z - s * lx), 0xffa855, 60, 16, 'lamp');
+          const lp = new THREE.Vector3(p.x + c * lx, ly, p.z - s * lx);
+          const src = this.lighting.addSource(lp, 0xffa855, 60, 16, 'lamp');
+          this.vol.add(lp, 0xffa060, src, ly - 0.1, 2.6);
         }
         break;
       }
@@ -348,7 +373,8 @@ export class Environment {
       case 'fence': this.place(P.fenceParts(p.len, rng), p.x, 0, p.z, rot); col.add(p.x, p.z, p.len / 2, 0.06, rot, 2.1, { kind: 'fence', blocksShots: false }); break;
       case 'lightRig': {
         this.place(P.lightRigParts(), p.x, 0, p.z, rng.range(0, 6));
-        this.lighting.addSource(new THREE.Vector3(p.x, 3.2, p.z), 0xfff0d0, 45, 18, 'lamp', { priority: 1.5 });
+        const src = this.lighting.addSource(new THREE.Vector3(p.x, 3.2, p.z), 0xfff0d0, 45, 18, 'lamp', { priority: 1.5 });
+        this.vol.add(new THREE.Vector3(p.x, 2.9, p.z), 0xfff0d0, src, 2.8, 3.2);
         col.add(p.x, p.z, 0.4, 0.4, 0, 1.2, { kind: 'pole', blocksShots: false });
         break;
       }
@@ -359,7 +385,20 @@ export class Environment {
         break;
       }
       case 'bush': this.place(P.bushParts(rng, p.s || 1), p.x, 0, p.z, rng.range(0, 6)); break;
-      case 'fire': this.addFire(p.x, 0.1, p.z, p.s || 1, p.campfire); break;
+      case 'fire':
+        if (p.debris) { // burning debris heap on the road
+          for (let i = 0; i < 6; i++) this.debris.add(p.x + rng.range(-0.6, 0.6), 0.1, p.z + rng.range(-0.6, 0.6), 1, rng.range(-0.4, 0.4), rng.range(0, 6), rng.range(-0.3, 0.3), 0x1a1410);
+          this.decals.push({ kind: 'scorch', x: p.x, z: p.z, s: 3.5, rot: rng.range(0, 6) });
+        }
+        this.addFire(p.x, 0.1, p.z, p.s || 1, p.campfire);
+        break;
+      case 'flare': {
+        const g = new THREE.CylinderGeometry(0.025, 0.025, 0.28, 6); g.rotateZ(Math.PI / 2); g.rotateY(rot); g.translate(p.x, 0.04, p.z);
+        this.batch.add(M.redLight, g);
+        const src = this.lighting.addSource(new THREE.Vector3(p.x, 0.35, p.z), 0xff2a12, 14, 9, 'fire', { priority: 1.2 });
+        this.flares.push({ x: p.x, z: p.z, src });
+        break;
+      }
       case 'rubblePile': {
         const s = p.s || 1;
         const g = rockGeo(p.seed % 1000, 1); g.scale(s, s * 0.45, s * rng.range(0.8, 1.3)); g.rotateY(rng.range(0, 6)); g.translate(p.x, -0.1, p.z);
@@ -518,6 +557,7 @@ export class Environment {
   dispose() {
     this.root.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
     this.scene.remove(this.root);
+    this.vol.dispose();
   }
 }
 

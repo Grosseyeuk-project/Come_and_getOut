@@ -29,7 +29,7 @@ export class Game {
     this.seed = qs.has('seed') ? (parseInt(qs.get('seed'), 10) >>> 0) : Math.floor(Math.random() * 1e6);
     this.mode = 'title'; this.paused = false;
     this.fps = 60; this.runTime = 0;
-    this.extractDur = 6; this.extractT = 0;
+    this.extractDur = 20; this.extractT = 0;
     this.hurtFlash = 0;
     this.raycaster = new THREE.Raycaster(); this.aimPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.2);
     this.aimPoint = new THREE.Vector3(); this.aimOverride = null;
@@ -64,8 +64,10 @@ export class Game {
     this.nav = new NavGrid(this.col, 1, 0.45);
     const pop = this.pop = populate(this.layout, this.nav, new RNG(this.seed ^ 0xbeef));
     this.fx = new Effects(scene, this.lighting, this.renderer);
+    this.fx.setAtmosphere(this.lighting.p);
     for (const f of this.env.fires) this.fx.addFire(f.x, f.y, f.z, f.s);
     for (const s of this.env.smokes) this.fx.addSmoker(s.x, s.y, s.z, s.s);
+    for (const f of this.env.flares) this.fx.addFlare(f.x, f.z);
     this.combat = new Combat(this);
     this.enemies = new EnemyManager(this);
     this.loot = new LootManager(this);
@@ -81,7 +83,7 @@ export class Game {
     const p = this.lighting.p, gu = this.renderer.grade.uniforms;
     gu.uTint.value.setRGB(...p.tint); gu.uShadowTint.value.setRGB(...p.shadowTint); gu.uSat.value = p.sat;
     this.renderer.renderer.toneMappingExposure = p.exposure;
-    this.extractT = 0; this.runTime = 0; this.flowT = 0; this.deathT = 0; this.waveSpawned = false;
+    this.extractT = 0; this.runTime = 0; this.flowT = 0; this.deathT = 0; this.waveSpawned = false; this.waveT = 1; this.waveRng = null;
     this.worldFresh = true;
     this.hud.newRun();
     this.renderer.updateCamera(0, new THREE.Vector3(this.player.pos.x, 0, this.player.pos.z), new THREE.Vector3(this.player.pos.x, 0, this.player.pos.z), true);
@@ -160,6 +162,7 @@ export class Game {
     }
     const focus = new THREE.Vector3(pl.pos.x, 0, pl.pos.z);
     this.lighting.update(dt, focus);
+    this.env.vol.update();
     this.fx.update(dt, focus, this.renderer.camera);
     if (this.mode === 'title') {
       const t = this.titleT || 0; this.renderer.rig.yaw = Math.PI / 4 + Math.sin(t * 0.05) * 0.4; this.renderer.rig.dist = 30;
@@ -187,9 +190,12 @@ export class Game {
     if (this.mode !== 'playing' || pl.dead) return;
     const inside = Math.hypot(pl.pos.x - ex.x, pl.pos.z - ex.z) < 4.2;
     if (inside) {
-      if (this.extractT === 0) { this.audio.play('beep', null, { f: 660 }); this.spawnEvacWave(); }
+      if (this.extractT === 0) { this.audio.play('beep', null, { f: 660 }); if (!this.waveSpawned) this.hud.toast('Evac called — hostiles converging, hold the zone!', '#ff6a50'); this.waveSpawned = true; }
       const prev = this.extractT;
       this.extractT += dt;
+      // escalating waves while holding the zone
+      this.waveT = (this.waveT ?? 1) - dt;
+      if (this.waveT <= 0) { this.waveT = 5.5; this.spawnEvacWave(2 + Math.floor(this.extractT / 7)); }
       if (Math.floor(prev) !== Math.floor(this.extractT)) this.audio.play('beep', null, { f: 880 });
       if (this.extractT >= this.extractDur) {
         this.mode = 'extracted'; this.audio.play('extracted');
@@ -197,15 +203,16 @@ export class Game {
       }
     } else this.extractT = Math.max(0, this.extractT - dt * 2);
   }
-  spawnEvacWave() {
-    if (this.waveSpawned) return; this.waveSpawned = true;
-    const ex = this.extraction, rng = new RNG(this.seed ^ 0x3a3a);
-    for (let i = 0; i < 4; i++) {
-      const a = rng.range(0, 6.28), r = rng.range(16, 24);
+  spawnEvacWave(n) {
+    const ex = this.extraction, rng = this.waveRng || (this.waveRng = new RNG(this.seed ^ 0x3a3a));
+    if (this.enemies.alive.filter((e) => e.group === 'wave').length > 10) return;
+    for (let i = 0; i < n; i++) {
+      const a = rng.range(0, 6.28), r = rng.range(18, 28);
       const p = this.nav.nearestWalkable(ex.x + Math.cos(a) * r, ex.z + Math.sin(a) * r, 6);
-      if (p && this.nav.isReachable(p.x, p.z)) { const e = this.enemies.spawn(i === 0 ? 'raider' : 'mutant', p.x, p.z, 'wave'); this.enemies.alertE(e, this.player.pos.x, this.player.pos.z); }
+      if (!p || !this.nav.isReachable(p.x, p.z)) continue;
+      const type = rng.weighted([['mutant', 5], ['raider', 4], ['brute', this.extractT > 10 ? 1.2 : 0]]);
+      const e = this.enemies.spawn(type, p.x, p.z, 'wave'); e.def === undefined || this.enemies.alertE(e, this.player.pos.x, this.player.pos.z, false);
     }
-    this.hud.toast('Hostiles inbound — hold the zone!', '#ff6a50');
   }
 
   loop(now) {

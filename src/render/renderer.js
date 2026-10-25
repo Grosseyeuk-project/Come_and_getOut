@@ -87,6 +87,16 @@ export class Renderer {
         this.ao.output = GTAOPass.OUTPUT.Default;
         this.ao.blendIntensity = 0.85;
         this.ao.updateGtaoMaterial({ radius: 0.9, distanceExponent: 1.4, thickness: 1.5, scale: 1.2, samples: 12 });
+        // keep transparent / additive / alpha-tested / sprite objects out of the AO normal+depth pass
+        const ao = this.ao;
+        ao.overrideVisibility = function () {
+          const cache = this._visibilityCache;
+          this.scene.traverse((o) => {
+            cache.set(o, o.visible);
+            const m = o.material;
+            if (o.isPoints || o.isLine || o.isSprite || (m && !Array.isArray(m) && (m.transparent || m.alphaTest > 0 || m.blending === THREE.AdditiveBlending))) o.visible = false;
+          });
+        };
         this.composer.addPass(this.ao);
       } catch (e) { console.warn('GTAO disabled', e); }
     }

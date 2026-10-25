@@ -25,11 +25,14 @@ export class Effects {
       scorch: new THREE.MeshStandardMaterial({ map: T.decal('scorch'), transparent: true, depthWrite: false, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }),
     };
     this.time = 0;
-    this.dustT = 0;
+    this.dustT = 0; this.mistT = 0; this.emberT = 0;
+    this.mistColor = [0.5, 0.5, 0.52]; this.ambientEmbers = 0.5; this.ash = 0;
   }
+  setAtmosphere({ mist, embers, ash }) { if (mist) this.mistColor = mist; this.ambientEmbers = embers ?? 0.5; this.ash = ash ?? 0; }
 
   addFire(x, y, z, s) { this.fires.push({ x, y, z, s, acc: 0 }); }
   addSmoker(x, y, z, s) { this.smokers.push({ x, y, z, s, acc: 0 }); }
+  addFlare(x, z) { this.flares = this.flares || []; this.flares.push({ x, z, acc: 0 }); }
 
   tracer(x0, y0, z0, x1, y1, z1, color = 0xffc070, width = 0.06, speed = 160) {
     const len = Math.hypot(x1 - x0, y1 - y0, z1 - z0);
@@ -132,6 +135,11 @@ export class Effects {
       const d = Math.hypot(s.x - focus.x, s.z - focus.z); if (d > 50) continue;
       s.acc += dt * 4 * s.s;
       while (s.acc > 1) { s.acc -= 1; this.smoke.emit({ x: s.x + (Math.random() - 0.5), y: s.y, z: s.z + (Math.random() - 0.5), vx: 0.4, vy: 1.0 + Math.random() * 0.5, vz: 0.2, life: 5, s0: 0.8, s1: 4 * s.s, c0: [0.07, 0.07, 0.07, 0.55], c1: [0.2, 0.2, 0.2, 0], drag: 0.2, fadeIn: 0.8 }); }
+    }
+    for (const f of this.flares || []) {
+      if (Math.hypot(f.x - focus.x, f.z - focus.z) > 40) continue;
+      f.acc += dt * 30;
+      while (f.acc > 1) { f.acc -= 1; this.add.emit({ x: f.x, y: 0.06, z: f.z, vx: (Math.random() - 0.5) * 0.6, vy: 0.5 + Math.random(), vz: (Math.random() - 0.5) * 0.6, life: 0.35, s0: 0.22, s1: 0.05, c0: [5, 0.6, 0.2, 1], c1: [2, 0.1, 0.05, 0] }); if (Math.random() < 0.08) this.smoke.emit({ x: f.x, y: 0.2, z: f.z, vx: 0.3, vy: 0.8, vz: 0.1, life: 3, s0: 0.3, s1: 1.8, c0: [0.5, 0.15, 0.12, 0], c1: [0.4, 0.2, 0.2, 0], arc: 0.25 }); }
     }
     // ambient dust motes around focus
     this.dustT += dt * 30;

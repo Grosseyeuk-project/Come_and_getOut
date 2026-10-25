@@ -92,7 +92,7 @@ function tn(u, v, f, oct, seed) { return fbm(u * f, v * f, oct, seed, f); }
 export function asphalt() {
   if (cache.asphalt) return cache.asphalt;
   const S = 512, rng = new RNG(11);
-  const cracks = crackMask(S, rng, 26, 1.6, 70);
+  const cracks = crackMask(S, rng, 9, 1.0, 60);
   cache.asphalt = genPBR(S, (u, v, x, y, o) => {
     const i = y * S + x;
     const n = tn(u, v, 6, 5, 3), fine = hash2(x, y, 7), patch = tn(u, v, 2, 3, 9);
@@ -100,9 +100,9 @@ export function asphalt() {
     let base = 0.1 + n * 0.08 + agg * 0.5 + (patch > 0.62 ? -0.035 : 0);
     const stain = tn(u, v, 3, 4, 21); if (stain > 0.66) base *= 0.65;
     const c = cracks[i];
-    base *= 1 - c * 0.8;
+    base *= 1 - c * 0.45;
     o.r = base * 1.02; o.g = base * 1.0; o.b = base * 1.04;
-    o.h = 0.5 + n * 0.3 + agg - c * 0.8;
+    o.h = 0.5 + n * 0.3 + agg - c * 0.5;
     o.ro = clamp(0.92 - (stain > 0.66 ? 0.35 : 0) - c * 0.1 + fine * 0.05, 0, 1);
   }, 2.5);
   return cache.asphalt;
@@ -178,7 +178,7 @@ export function dirt() {
     const peb = vnoise(u * 64, v * 64, 64, 64);
     const stone = peb > 0.78 ? (peb - 0.78) * 4 : 0;
     const grass = clamp((tn(u, v, 3, 4, 65) - 0.5) * 3, 0, 1);
-    let r = 0.2 + n * 0.1, g = 0.17 + n * 0.08, b = 0.13 + n * 0.06;
+    let r = 0.17 + n * 0.09, g = 0.155 + n * 0.08, b = 0.135 + n * 0.07;
     r = r * (1 - grass) + (0.14 + d * 0.06) * grass; g = g * (1 - grass) + (0.17 + d * 0.08) * grass; b = b * (1 - grass) + (0.08 + d * 0.03) * grass;
     r += stone * 0.2; g += stone * 0.19; b += stone * 0.18;
     o.r = r + (f - 0.5) * 0.04; o.g = g + (f - 0.5) * 0.04; o.b = b + (f - 0.5) * 0.03;
@@ -195,10 +195,10 @@ export function pavers() {
     const i = y * S + x, g = 4;
     const gx = u * g, gy = v * g, fx = gx % 1, fy = gy % 1;
     const tid = hash2(Math.floor(gx), Math.floor(gy), 72);
-    const joint = fx < 0.025 || fy < 0.025;
+    const joint = fx < 0.018 || fy < 0.018;
     const n = tn(u, v, 8, 4, 73), f = hash2(x, y, 74);
     const missing = tid > 0.93;
-    let b = joint ? 0.07 : 0.17 + tid * 0.06 + n * 0.08 + (f - 0.5) * 0.04;
+    let b = joint ? 0.11 : 0.17 + tid * 0.06 + n * 0.08 + (f - 0.5) * 0.04;
     b *= 0.75 + 0.5 * tn(u, v, 3, 3, 76);
     if (missing) b = 0.16 + n * 0.06;
     b *= 1 - cracks[i] * 0.6;
@@ -424,4 +424,34 @@ export function beamTex() {
   g.fillStyle = grd; g.fillRect(0, 0, 4, 128);
   cache.beam = toTex(c, true, false);
   return cache.beam;
+}
+
+// Graffiti atlas: 4x2 cells of spray-painted tags/symbols.
+export function graffitiAtlas() {
+  if (cache.graffiti) return cache.graffiti;
+  const W = 1024, H = 512, c = canvas(W, H), g = c.getContext('2d'), rng = new RNG(909);
+  const cols = ['#c8281e', '#e8e2d0', '#e0b020', '#2aa8c8', '#111111', '#7ac040', '#d050a0'];
+  const words = ['GET OUT', 'NO GOD', 'RUN', 'KEEP OUT', 'DEAD ZONE', '13', 'EXIT ->', 'THEY HEAR'];
+  for (let k = 0; k < 8; k++) {
+    const cx = (k % 4) * 256, cy = Math.floor(k / 4) * 256;
+    g.save(); g.beginPath(); g.rect(cx, cy, 256, 256); g.clip(); g.translate(cx + 128, cy + 128); g.rotate(rng.range(-0.15, 0.15));
+    const col = rng.pick(cols);
+    g.shadowColor = col; g.shadowBlur = 6; g.strokeStyle = col; g.fillStyle = col; g.lineCap = 'round'; g.lineJoin = 'round';
+    if (k % 3 === 2) { // symbol: anarchy circle / skull-ish / arrow
+      g.lineWidth = 10; g.beginPath(); g.arc(0, 0, 70, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.moveTo(-50, 60); g.lineTo(0, -75); g.lineTo(50, 60); g.moveTo(-60, 10); g.lineTo(60, 10); g.stroke();
+    } else {
+      g.font = `bold ${rng.int(54, 78)}px Impact, Arial Black, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      const w = words[k]; g.lineWidth = 6; g.strokeText(w, 0, 0); g.globalAlpha = 0.85; g.fillText(w, 0, 0); g.globalAlpha = 1;
+    }
+    // drips
+    g.shadowBlur = 0; g.lineWidth = 3;
+    for (let i = 0; i < 10; i++) { const x = rng.range(-100, 100), y = rng.range(-10, 30); g.globalAlpha = 0.7; g.beginPath(); g.moveTo(x, y); g.lineTo(x + rng.range(-2, 2), y + rng.range(15, 70)); g.stroke(); }
+    // weathering
+    g.globalCompositeOperation = 'destination-out'; g.globalAlpha = 1;
+    for (let i = 0; i < 260; i++) { g.fillStyle = `rgba(0,0,0,${rng.range(0.2, 0.9)})`; g.beginPath(); g.arc(rng.range(-128, 128), rng.range(-128, 128), rng.range(1, 6), 0, 7); g.fill(); }
+    g.restore();
+  }
+  cache.graffiti = toTex(c, true, false);
+  return cache.graffiti;
 }
