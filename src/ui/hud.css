@@ -1,0 +1,89 @@
+:root { --amber: #ffb347; --red: #ff4a3a; --panel: rgba(12, 12, 14, 0.62); --line: rgba(255, 255, 255, 0.12); --txt: #e8e2d6; --dim: #9a9488; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0a0a0b; color: var(--txt); font-family: "Bahnschrift", "DIN Alternate", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; user-select: none; }
+#app canvas { display: block; cursor: none; }
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+.hidden { display: none !important; }
+.panel { background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(3px); }
+.label { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim); }
+#objective { position: absolute; top: 18px; left: 18px; padding: 10px 14px 10px 12px; min-width: 260px; border-left: 3px solid var(--amber); }
+#objective .t { font-size: 15px; letter-spacing: 0.06em; margin-top: 3px; text-transform: uppercase; }
+#objective .d { font-size: 12px; color: var(--amber); margin-top: 3px; font-variant-numeric: tabular-nums; }
+#zone { position: absolute; top: 96px; left: 18px; font-size: 10px; letter-spacing: 0.25em; color: var(--dim); text-transform: uppercase; }
+#minimap { position: absolute; top: 16px; right: 16px; width: 210px; height: 210px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.18); box-shadow: 0 0 0 4px rgba(0,0,0,0.35), inset 0 0 30px rgba(0,0,0,0.8); }
+#mmlabel { position: absolute; top: 232px; right: 16px; width: 210px; text-align: center; }
+#health { position: absolute; left: 22px; bottom: 22px; width: 340px; padding: 10px 12px 12px; }
+#hpbar { position: relative; height: 16px; margin-top: 6px; background: rgba(255,255,255,0.06); overflow: hidden; }
+#hpfill { position: absolute; inset: 0; width: 100%; background: linear-gradient(90deg, #a8261c, #e2463a); transition: width 0.15s; }
+#hplag { position: absolute; inset: 0; width: 100%; background: rgba(255, 200, 160, 0.5); transition: width 0.6s 0.25s; }
+#hpbar .seg { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(0,0,0,0.6); }
+#hptext { position: absolute; right: 12px; top: 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
+#pips { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
+.pip { width: 34px; height: 5px; background: rgba(255,255,255,0.12); position: relative; overflow: hidden; }
+.pip i { position: absolute; inset: 0; background: #7fd6ff; transform-origin: left; }
+#medkits { margin-left: auto; font-size: 12px; color: var(--txt); }
+#medkits b { color: #ff5a4a; }
+#weapon { position: absolute; right: 22px; bottom: 22px; width: 320px; padding: 10px 14px 12px; text-align: right; }
+#wname { font-size: 16px; letter-spacing: 0.04em; text-transform: uppercase; }
+#wtype { margin-top: 2px; }
+#ammo { font-size: 44px; line-height: 1; margin-top: 6px; font-variant-numeric: tabular-nums; font-weight: 600; }
+#ammo small { font-size: 18px; color: var(--dim); font-weight: 400; }
+#reloadbar { height: 3px; background: rgba(255,255,255,0.08); margin-top: 8px; }
+#reloadbar i { display: block; height: 100%; width: 0; background: var(--amber); }
+#wsec { margin-top: 8px; font-size: 11px; color: var(--dim); letter-spacing: 0.08em; text-transform: uppercase; }
+#crosshair { position: absolute; width: 0; height: 0; }
+#crosshair i { position: absolute; background: rgba(255,255,255,0.9); box-shadow: 0 0 2px #000; }
+#crosshair .dot { width: 3px; height: 3px; left: -1.5px; top: -1.5px; border-radius: 50%; }
+#hitm { position: absolute; width: 0; height: 0; opacity: 0; }
+#hitm i { position: absolute; width: 10px; height: 2px; background: #fff; left: -5px; top: -1px; box-shadow: 0 0 3px rgba(0,0,0,0.8); }
+#hitm.kill i { background: var(--red); height: 3px; }
+#reloadring { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; }
+#dmg, #bars, #prompts { position: absolute; inset: 0; }
+.dn { position: absolute; font-weight: 700; font-size: 16px; color: #fff; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0,0,0,0.7); transform: translate(-50%, -50%); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dn.crit { color: #ffcf3a; font-size: 22px; }
+.ebar { position: absolute; width: 46px; height: 4px; margin-left: -23px; background: rgba(0,0,0,0.6); border: 1px solid rgba(0,0,0,0.6); }
+.ebar i { display: block; height: 100%; background: #e2463a; }
+#prompt { position: absolute; transform: translate(-50%, -100%); padding: 9px 12px; min-width: 210px; border-top: 2px solid #888; }
+#prompt .n { font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
+#prompt .r { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; margin-top: 2px; }
+#prompt .s { font-size: 12px; color: var(--txt); margin-top: 6px; line-height: 1.5; }
+#prompt .k { display: inline-block; border: 1px solid #ccc; padding: 0 5px; margin-right: 6px; font-size: 11px; }
+.up { color: #6fe36a; } .down { color: #ff6a5a; }
+#feed { position: absolute; left: 22px; bottom: 130px; display: flex; flex-direction: column-reverse; gap: 4px; }
+.fi { padding: 5px 10px; font-size: 12px; border-left: 3px solid; background: rgba(10,10,12,0.6); animation: fin 0.25s ease-out; }
+.fi small { color: var(--dim); margin-left: 8px; }
+@keyframes fin { from { transform: translateX(-20px); opacity: 0; } to { transform: none; opacity: 1; } }
+#toast { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); font-size: 14px; letter-spacing: 0.2em; text-transform: uppercase; text-shadow: 0 1px 4px #000; transition: opacity 0.3s; }
+#extractbar { position: absolute; top: 30%; left: 50%; transform: translateX(-50%); width: 360px; text-align: center; padding: 10px 14px; }
+#extractbar .bar { height: 6px; background: rgba(255,255,255,0.08); margin-top: 8px; }
+#extractbar .bar i { display: block; height: 100%; background: #5dff8a; width: 0; box-shadow: 0 0 10px #5dff8a; }
+#inventory { position: absolute; inset: 0; background: rgba(5,5,6,0.72); display: flex; align-items: center; justify-content: center; pointer-events: auto; }
+#inventory .wrap { width: min(920px, 94vw); padding: 22px; }
+#inventory h2 { margin: 0 0 4px; font-size: 22px; letter-spacing: 0.25em; text-transform: uppercase; font-weight: 500; }
+.slots { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0 18px; }
+.bag { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.card { padding: 10px 12px; border: 1px solid var(--line); border-top: 3px solid; background: rgba(20,20,22,0.85); cursor: pointer; min-height: 92px; }
+.card:hover { background: rgba(40,40,44,0.9); }
+.card.sel { box-shadow: 0 0 0 1px var(--amber) inset; }
+.card .n { font-size: 13px; text-transform: uppercase; letter-spacing: 0.03em; }
+.card .r { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; margin: 2px 0 6px; }
+.card .s { font-size: 11px; color: var(--dim); line-height: 1.5; }
+.card .a { font-size: 11px; color: #c8b890; }
+.card.empty { opacity: 0.35; cursor: default; display: flex; align-items: center; justify-content: center; font-size: 11px; letter-spacing: 0.2em; }
+.stats-row { display: flex; gap: 22px; font-size: 12px; color: var(--dim); margin-top: 14px; }
+.stats-row b { color: var(--txt); font-weight: 500; }
+.screen { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: radial-gradient(ellipse at center, rgba(20,14,10,0.35), rgba(0,0,0,0.88)); }
+.screen h1 { font-size: clamp(36px, 7vw, 86px); margin: 0; letter-spacing: 0.18em; font-weight: 700; text-transform: uppercase; color: #ece4d4; text-shadow: 0 0 30px rgba(255,140,40,0.25), 0 4px 0 #000; }
+.screen h1 span { color: var(--amber); }
+.screen .sub { letter-spacing: 0.5em; font-size: 12px; color: var(--dim); text-transform: uppercase; margin-top: 10px; }
+.screen .row { display: flex; gap: 10px; margin-top: 34px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.btn { pointer-events: auto; cursor: pointer; padding: 12px 26px; background: rgba(255,179,71,0.1); border: 1px solid var(--amber); color: var(--amber); font: inherit; letter-spacing: 0.3em; text-transform: uppercase; font-size: 13px; }
+.btn:hover { background: rgba(255,179,71,0.25); color: #fff; }
+.btn.ghost { border-color: var(--line); color: var(--txt); background: rgba(255,255,255,0.03); }
+.seed { pointer-events: auto; background: rgba(0,0,0,0.5); border: 1px solid var(--line); color: var(--txt); font: inherit; padding: 11px 12px; width: 150px; letter-spacing: 0.15em; text-align: center; }
+.controls { margin-top: 36px; display: grid; grid-template-columns: auto auto auto auto; gap: 6px 22px; font-size: 12px; color: var(--dim); text-align: left; }
+.controls b { color: var(--txt); font-weight: 500; display: inline-block; min-width: 54px; }
+.screen .big { font-size: 14px; color: var(--txt); margin-top: 18px; line-height: 1.9; letter-spacing: 0.08em; }
+.screen.dead h1 { color: #ff5a46; text-shadow: 0 0 40px rgba(255,40,20,0.35), 0 4px 0 #000; }
+.screen.win h1 { color: #7dffa0; text-shadow: 0 0 40px rgba(60,255,120,0.3), 0 4px 0 #000; }
+@media (max-width: 700px) { #minimap { width: 130px; height: 130px; } #mmlabel { top: 150px; width: 130px; } #health { width: 220px; } #weapon { width: 210px; } #ammo { font-size: 30px; } .bag { grid-template-columns: repeat(2, 1fr); } .controls { grid-template-columns: auto auto; } }
