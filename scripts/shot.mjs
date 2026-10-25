@@ -72,6 +72,12 @@ for (const sc of scenarios) {
     } else if (sc === 'inventory') { await g(() => window.__game.toggleInventory(true)); await frames(2); await shot('inventory'); await g(() => window.__game.toggleInventory(false)); }
     else if (sc === 'death') { await g(() => { window.__game.godMode(false); window.__game.damagePlayer(9999); window.__game.advance(2.5); }); await frames(2); await shot('death'); }
     else if (sc === 'extract') { await g(() => { const s = window.__game.state(); window.__game.teleport(s.extraction.x, s.extraction.z); window.__game.advance(1.5); }); await frames(2); await shot('extract_zone'); await g(() => window.__game.advance(7)); await frames(2); await shot('extracted'); }
+    else if (sc === 'crate') {
+      const r = await g(() => { const G = window.__game, gm = G.game, p = gm.player.pos; const c = gm.loot.crates.filter((c) => !c.opened).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0]; if (!c) return 'no crate'; G.teleport(c.x + 1.2, c.z + 0.6); G.advance(0.1); G.input.simKey('KeyE', true); G.advance(1 / 60); G.input.simKey('KeyE', false); G.advance(0.8); return { tier: c.tier, opened: c.opened, drops: gm.loot.drops.length }; });
+      console.log('[crate]', JSON.stringify(r)); await frames(2); await shot('crate');
+      const r2 = await g(() => { const G = window.__game, gm = G.game; const d = gm.loot.drops.find((d) => d.item.kind === 'weapon'); if (!d) return 'no weapon drop'; G.teleport(d.x + 0.5, d.z); G.advance(0.2); G.input.simKey('KeyE', true); G.advance(1 / 60); G.input.simKey('KeyE', false); G.advance(0.2); return { backpack: gm.player.backpack.length, name: d.item.name }; });
+      console.log('[pickup]', JSON.stringify(r2));
+    }
     else if (sc === 'autoplay') { const r = await g((s) => window.__game.autoplay(s), +opt('time', 90)); console.log('[autoplay]', JSON.stringify(r)); await frames(2); await shot('autoplay'); }
     else if (sc === 'overview') { await g(() => window.__game.setZoom(2.4)); await frames(2); await shot('overview'); await g(() => window.__game.setZoom(1)); }
     else if (sc === 'eval') { console.log(await page.evaluate(String(opt('eval', '0')))); await frames(2); await shot('eval'); }

@@ -236,7 +236,7 @@ export class Environment {
         // graffiti on street level
         if (rng.chance(0.12) && top > 2.6 && !isDoor) this.graffiti(S, ux, uz, nx, nz, (t0 + t1) / 2, rng.range(0.9, 1.6), rng.range(1.8, 2.6), rng.int(0, 7));
         // vines
-        if (rng.chance(0.18)) {
+        if (rng.chance(0.28)) {
           const vh = Math.min(top, rng.range(2, 6)), vg = new THREE.PlaneGeometry(bw * 0.95, vh);
           const vm = new THREE.Matrix4().makeRotationY(Math.atan2(nx, nz));
           vg.applyMatrix4(vm); vg.translate(S.ax + ux * (t0 + t1) / 2 + nx * 0.04, top - vh / 2, S.az + uz * (t0 + t1) / 2 + nz * 0.04);
@@ -355,7 +355,7 @@ export class Environment {
         this.place(P.lampParts(p.bent, p.working), p.x, 0, p.z, rot);
         col.add(p.x, p.z, 0.15, 0.15, 0, 6, { kind: 'pole' });
         if (p.working) {
-          const c = Math.cos(rot), s = Math.sin(rot); const lx = p.bent ? 1.2 : 1.55, ly = p.bent ? 5.2 : 5.9;
+          const c = Math.cos(rot), s = Math.sin(rot); const lx = p.bent ? 3.5 : 1.55, ly = p.bent ? 5.1 : 5.9; // bent poles are rotated -0.35rad about Z
           const lp = new THREE.Vector3(p.x + c * lx, ly, p.z - s * lx);
           const src = this.lighting.addSource(lp, 0xffa855, 60, 16, 'lamp');
           this.vol.add(lp, 0xffa060, src, ly - 0.1, 2.6);
@@ -500,7 +500,7 @@ export class Environment {
     const pts = [];
     const tryAdd = (x, z, s) => { if (!col.blockedCircle(x, z, 0.25, 0.2)) pts.push([x, z, s]); };
     for (const a of L.grassAreas) {
-      const n = Math.floor((a.x1 - a.x0) * (a.z1 - a.z0) * 0.22 * a.density);
+      const n = Math.floor((a.x1 - a.x0) * (a.z1 - a.z0) * 0.34 * a.density);
       for (let i = 0; i < n; i++) {
         const x = rng.range(a.x0, a.x1), z = rng.range(a.z0, a.z1);
         if (fbm(x * 0.08, z * 0.08, 2, 9) < 0.42) continue;

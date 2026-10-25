@@ -192,7 +192,7 @@ function decorateRoads(L, rng) {
       }
     }
     // decals
-    for (let i = 0; i < Math.ceil(len / 6); i++) { const p = at(s, rng.range(s.a, s.b), rng.range(-s.w / 2, s.w / 2)); L.decals.push({ kind: rng.weighted([['crack', 4], ['oil', 2], ['puddle', 2], ['trash', 2], ['scorch', 1]]), ...p, s: rng.range(1.5, 4.5), rot: rng.range(0, 6.28) }); }
+    for (let i = 0; i < Math.ceil(len / 6); i++) { const p = at(s, rng.range(s.a, s.b), rng.range(-s.w / 2, s.w / 2)); L.decals.push({ kind: rng.weighted([['crack', 4], ['oil', 2], ['puddle', 3], ['trash', 2], ['scorch', 1]]), ...p, s: rng.range(1.5, 5), rot: rng.range(0, 6.28) }); }
     // center line dashes
     for (let a = s.a + 2; a < s.b - 2; a += 4.5) { if (rng.chance(0.15)) continue; const p = at(s, a, 0); L.decals.push({ kind: 'dash', ...p, s: 2.2, rot: rotAlong(s), sx: 0.6 }); }
     // lamps along sidewalks

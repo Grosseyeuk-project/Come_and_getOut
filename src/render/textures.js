@@ -390,7 +390,7 @@ export function decal(kind) {
     g.putImageData(id, 0, 0);
   } else if (kind === 'trash') {
     for (let i = 0; i < 40; i++) {
-      g.fillStyle = `rgba(${rng.int(90, 200)},${rng.int(80, 180)},${rng.int(60, 150)},${rng.range(0.5, 0.95)})`;
+      { const v = rng.int(60, 170), w = rng.next() < 0.3; g.fillStyle = w ? `rgba(${v + 40},${v + 36},${v + 28},${rng.range(0.5, 0.9)})` : `rgba(${v},${Math.round(v * 0.85)},${Math.round(v * 0.65)},${rng.range(0.5, 0.9)})`; }
       g.save(); g.translate(rng.range(20, 236), rng.range(20, 236)); g.rotate(rng.range(0, 6.3));
       g.fillRect(-rng.range(3, 14), -rng.range(2, 9), rng.range(6, 26), rng.range(4, 16)); g.restore();
     }
