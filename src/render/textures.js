@@ -560,7 +560,7 @@ export function facade(style = 'concrete') {
   if (cache[k]) return cache[k];
   const S = 512, BX = 4, BY = 4, rng = new RNG(hashKind(style));
   const cells = [];
-  for (let j = 0; j < BY; j++) for (let i = 0; i < BX; i++) cells.push(rng.weighted([['dark', 9], ['lit', 2], ['litCold', 1], ['broken', 2], ['boarded', 1], ['wall', 1]]));
+  for (let j = 0; j < BY; j++) for (let i = 0; i < BX; i++) cells.push(rng.weighted([['dark', 8], ['lit', 3], ['litCold', 1.4], ['broken', 2], ['boarded', 1], ['wall', 1]]));
   const base = style === 'brick' ? [0.3, 0.15, 0.1] : style === 'plaster' ? [0.42, 0.38, 0.32] : [0.34, 0.33, 0.31];
   const em = new Float32Array(S * S * 3);
   const tex = genPBR(S, (u, v, x, y, o) => {

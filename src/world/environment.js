@@ -70,6 +70,7 @@ export class Environment {
     this.signs = []; // emissive signage {pos, color, flicker, seed, dead}: lighting can pair lights with these
     this.anchors = []; // facade cable anchors
     this.winLights = 0;
+    this.beacons = []; // red rooftop aviation lights (positions) for blinking fx
     this.neon = (layout.themeDef && layout.themeDef.neon) || 1;
     this.emissiveMeshes = []; // filled after batching: meshes whose material is emissive (neon, bulbs, windows)
 
@@ -107,7 +108,7 @@ export class Environment {
   }
 
   addBox(mat, cx, cy, cz, sx, sy, sz, ry = 0, color = 0xffffff, uvScale = 0.33, rx = 0, rz = 0, jag = 0, grime = false) {
-    const hs = grime ? Math.min(8, Math.max(1, Math.ceil(sy / 1.1))) : 1;
+    const hs = grime ? (sy > 4 ? 3 : sy > 1.4 ? 2 : 1) : 1;
     const g = new THREE.BoxGeometry(sx, sy, sz, jag ? Math.max(1, Math.round(sx / 0.8)) : 1, hs, jag ? Math.max(1, Math.round(sz / 0.8)) : 1);
     if (jag) { // broken top edge: displace top vertices (shared positions moved identically)
       const p = g.attributes.position, off = new Map(), r = this.rng;
@@ -189,7 +190,8 @@ export class Environment {
       return H * (1 - k);
     };
     // floor slab
-    this.addBox(M.concrete, (b.x0 + b.x1) / 2, 0.06, (b.z0 + b.z1) / 2, w, 0.12, d, 0, 0xb8b4ac, 0.25);
+    this.addBox(M.concrete, (b.x0 + b.x1) / 2, 0.06, (b.z0 + b.z1) / 2, w, 0.12, d, 0, b.collapsed ? 0x6e6a64 : 0x8e8a84, 0.25);
+    for (let i = 0; i < Math.ceil(w * d / 40); i++) this.decals.push({ kind: rng.pick(['dirt', 'stain', 'crack', 'paper']), x: rng.range(b.x0 + 1, b.x1 - 1), z: rng.range(b.z0 + 1, b.z1 - 1), s: rng.range(2, 4.5), rot: rng.range(0, 6) });
     this.setH(b.x0, b.z0, b.x1, b.z1, 0.12);
     // openings: breaches + doors
     const per = 2 * (w + d);
@@ -851,10 +853,20 @@ export class Environment {
           for (let i = 0; i < 4; i++) this.addBox(M.concreteWall, cx + rng.range(-sx / 2.5, sx / 2.5), H + rng.range(0.6, 2.2), cz + rng.range(-sz / 2.5, sz / 2.5), rng.range(0.4, 2.5), rng.range(1.2, 4), rng.range(0.4, 2.5), rng.range(0, 1), o.tint, 0.33, rng.range(-0.15, 0.15), rng.range(-0.15, 0.15));
           for (let i = 0; i < 6; i++) this.rebar.add(cx + rng.range(-sx / 2, sx / 2), H + 0.5, cz + rng.range(-sz / 2, sz / 2), [1.5, rng.range(1, 2.5), 1.5], rng.range(-0.5, 0.5), 0, rng.range(-0.5, 0.5));
         }
-        // rooftop junk
-        for (let i = 0; i < Math.ceil(sx * sz / 60); i++) {
-          const x = cx + rng.range(-sx / 2 + 1.5, sx / 2 - 1.5), z = cz + rng.range(-sz / 2 + 1.5, sz / 2 - 1.5);
-          if (rng.chance(0.3)) this.place(K.waterTankParts(rng), x, H, z, rng.range(0, 3)); else this.place(K.roofVentParts(rng), x, H, z, rng.range(0, 6));
+        // rooftop junk: tanks, vents, AC banks, sheds, beacons, lit skylights, roof puddles
+        for (let i = 0; i < Math.ceil(sx * sz / 30); i++) {
+          const x = cx + rng.range(-sx / 2 + 1.5, sx / 2 - 1.5), z = cz + rng.range(-sz / 2 + 1.5, sz / 2 - 1.5), k = rng.next();
+          if (k < 0.2) this.place(K.waterTankParts(rng), x, H, z, rng.range(0, 3));
+          else if (k < 0.5) this.place(K.roofVentParts(rng), x, H, z, rng.range(0, 6));
+          else if (k < 0.65) this.place(K.acUnitParts(), x, H + 0.3, z, rng.range(0, 6));
+          else if (k < 0.78) this.addBox(M.concreteWall, x, H + 1.2, z, rng.range(2, 4), 2.4, rng.range(2, 3.5), rng.pick([0, Math.PI / 2]), o.tint, 0.33, 0, 0, 0, true); // stair hut
+          else if (k < 0.9) { const g = K.box(rng.range(1.2, 2.4), 0.12, rng.range(1.2, 2.4), x, H + 0.06, z); this.batch.add(M.windowLit, colorize(g.toNonIndexed(), new THREE.Color(rng.pick([0xffa050, 0x80b0ff, 0xffd090])).multiplyScalar(rng.range(0.3, 0.7)))); }
+          else this.decals.push({ kind: 'puddle', x, z, s: rng.range(2, 4), rot: rng.range(0, 6), y: H });
+        }
+        if (fl >= 6 && rng.chance(0.7)) { // antenna mast with a red aviation beacon
+          const x = cx + rng.range(-sx / 4, sx / 4), z = cz + rng.range(-sz / 4, sz / 4), mh = rng.range(4, 9);
+          this.place([{ mat: M.kitMetal, geo: colorize(K.cyl(0.06, 0.1, mh, 6, 0, mh / 2, 0).toNonIndexed(), 0x707070) }, { mat: M.redLight, geo: new THREE.SphereGeometry(0.16, 8, 6).translate(0, mh, 0) }], x, H, z, 0);
+          this.beacons.push(new THREE.Vector3(x, H + mh, z));
         }
         // billboard / blade neon facing the playable square
         if (!o.near && rng.chance(Math.min(0.9, 0.5 * this.neon))) {
@@ -911,7 +923,7 @@ export class Environment {
       if (d.kind === 'dash') { add('dash', d.x, d.z, 0.5, 2.4, d.rot); continue; }
       if (d.kind === 'crosswalk') { add('crosswalk', d.x, d.z, d.s, 3.2, d.rot); continue; }
       const y = { puddle: 0.047, wet: 0.026, dirt: 0.028, patch: 0.024, stain: 0.027, manhole: 0.044, drain: 0.044, edge: 0.036, arrow: 0.036 }[d.kind];
-      add(d.kind, d.x, d.z, d.sx || d.s, d.sz || d.s, d.rot, (y || 0.03 + ((d.x * 13.7 + d.z * 7.1) % 1 + 1) % 1 * 0.01) + this.heightAt(d.x, d.z));
+      add(d.kind, d.x, d.z, d.sx || d.s, d.sz || d.s, d.rot, (y || 0.03 + ((d.x * 13.7 + d.z * 7.1) % 1 + 1) % 1 * 0.01) + (d.y !== undefined ? d.y + 0.01 : this.heightAt(d.x, d.z)));
     }
     // blood / scorch get dynamic additions via fx; here static only
     const geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);

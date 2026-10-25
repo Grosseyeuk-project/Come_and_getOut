@@ -36,8 +36,7 @@ function wheel(parts, M, x, z, r, burnt, side) {
     parts.push({ mat: M.rust, geo: cyl(r * 0.45, r * 0.45, 0.2, 8, x, r * 0.7, z, Math.PI / 2) });
     return;
   }
-  parts.push({ mat: M.tire, geo: cyl(r, r, 0.26, 18, x, r, z, Math.PI / 2) });
-  parts.push({ mat: M.tire, geo: xf(new THREE.TorusGeometry(r * 0.86, 0.09, 6, 18), x, r, z) });
+  parts.push({ mat: M.tire, geo: cyl(r, r, 0.26, 14, x, r, z, Math.PI / 2) });
   parts.push({ mat: M.rim, geo: cyl(r * 0.6, r * 0.62, 0.05, 12, x, r, z + side * 0.12, Math.PI / 2) });
   parts.push({ mat: M.black, geo: cyl(r * 0.18, r * 0.18, 0.07, 6, x, r, z + side * 0.14, Math.PI / 2) });
 }
@@ -68,7 +67,7 @@ export function carParts(variant, paint, burnt) {
     add(glass, extrude([[1.72, 1.18], [1.27, 1.88], [0.95, 1.9], [0.95, 1.2]], W - 0.06, 0.03));
     add(glass, box(0.9, 0.42, W + 0.01, 0.2, 1.55, 0));
     add(trimM, box(0.03, 1.2, 0.02, -0.6, 1.0, W / 2 + 0.005)); add(trimM, box(2.0, 0.03, 0.02, -1.4, 0.36 + 1.5, W / 2 + 0.005));
-    add(burnt ? M.carBurnt : M.rust, box(1.6, 0.06, 1.2, -1.0, 2.07, 0)); // roof rack
+    for (const sz of [-1, 1]) add(M.black, box(2.2, 0.05, 0.05, -1.0, 2.1, sz * 0.62)); for (const x of [-1.9, -1.0, -0.1]) add(M.black, box(0.05, 0.05, 1.3, x, 2.12, 0)); // roof rack rails
   } else if (variant === 2) { // pickup
     W = 1.85; wheelX = [1.55, -1.55 - 0.6]; wheelR = 0.4; front = 2.47; back = -2.68; lightY = 0.8;
     add(body, extrude([[-0.3, 0.4], { arc: [1.55, 0.4, 0.48] }, [2.3, 0.4], [2.45, 0.65], [2.4, 1.05], [1.3, 1.15], [0.75, 1.75], [-0.35, 1.78]], W - 0.12, 0.06));
@@ -170,7 +169,7 @@ export function plankParts(len = 2.6, rng = new RNG(2)) {
 }
 export function tireParts(rng = new RNG(3)) {
   const M = materials(); const parts = [];
-  const proto = new THREE.TorusGeometry(0.31, 0.13, 8, 16); proto.rotateX(Math.PI / 2);
+  const proto = new THREE.TorusGeometry(0.31, 0.13, 5, 12); proto.rotateX(Math.PI / 2);
   const stacks = rng.int(1, 3);
   for (let s = 0; s < stacks; s++) {
     const ox = (s - (stacks - 1) / 2) * 0.75, h = rng.int(2, 4);

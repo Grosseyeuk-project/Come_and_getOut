@@ -36,7 +36,7 @@ export function trashCanParts(rng) {
 export function bagPileParts(rng, n = 6) {
   const M = materials(), parts = [];
   for (let i = 0; i < n; i++) {
-    const g = new THREE.SphereGeometry(1, 8, 6); const s = rng.range(0.22, 0.36);
+    const g = new THREE.SphereGeometry(1, 7, 5); const s = rng.range(0.22, 0.36);
     const pa = g.attributes.position; for (let k = 0; k < pa.count; k++) { const y = pa.getY(k); pa.setY(k, y < -0.3 ? -0.3 - (y + 0.3) * 0.2 : y); if (y > 0.85) { pa.setX(k, pa.getX(k) * 0.4); pa.setZ(k, pa.getZ(k) * 0.4); } }
     g.computeVertexNormals(); g.scale(s, s * 0.85, s * rng.range(0.8, 1.2));
     xf(g, rng.range(-0.6, 0.6), s * 0.3 + (i > n * 0.6 ? s * 0.8 : 0), rng.range(-0.45, 0.45), rng.range(-0.3, 0.3), rng.range(0, 6), rng.range(-0.3, 0.3));
