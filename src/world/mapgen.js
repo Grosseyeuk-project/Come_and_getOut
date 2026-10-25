@@ -5,6 +5,7 @@ import { RNG } from '../core/rng.js';
 import { PALETTES } from './lighting.js';
 
 export const HALF = 72;
+export const OUTER = 46; // visual-only city ring beyond the playable square
 const SIDEWALK = 2.4;
 
 export function generateLayout(seed) {
@@ -19,8 +20,8 @@ export function generateLayout(seed) {
   };
   const rx = mk(rng.fork('rx')), rz = mk(rng.fork('rz'));
   // optionally drop a road segment entirely to create larger superblocks (variety per seed)
-  for (const r of rx) L.roads.push({ axis: 'z', x: r.p, w: r.w, z0: -HALF, z1: HALF });
-  for (const r of rz) L.roads.push({ axis: 'x', z: r.p, w: r.w, x0: -HALF, x1: HALF });
+  for (const r of rx) L.roads.push({ axis: 'z', x: r.p, w: r.w, z0: -HALF - OUTER, z1: HALF + OUTER });
+  for (const r of rz) L.roads.push({ axis: 'x', z: r.p, w: r.w, x0: -HALF - OUTER, x1: HALF + OUTER });
   L.roadsX = rx; L.roadsZ = rz;
   if (forced && PALETTES[forced]) L.palette = forced;
 
@@ -33,8 +34,9 @@ export function generateLayout(seed) {
   const ix = intervals(rx), iz = intervals(rz);
 
   // sidewalks (strips along both sides of each road, full length)
-  for (const r of rx) { L.sidewalks.push({ x0: r.p - r.w / 2 - SIDEWALK, x1: r.p - r.w / 2, z0: -HALF - 6, z1: HALF + 6 }); L.sidewalks.push({ x0: r.p + r.w / 2, x1: r.p + r.w / 2 + SIDEWALK, z0: -HALF - 6, z1: HALF + 6 }); }
-  for (const r of rz) { L.sidewalks.push({ z0: r.p - r.w / 2 - SIDEWALK, z1: r.p - r.w / 2, x0: -HALF - 6, x1: HALF + 6 }); L.sidewalks.push({ z0: r.p + r.w / 2, z1: r.p + r.w / 2 + SIDEWALK, x0: -HALF - 6, x1: HALF + 6 }); }
+  const E = HALF + OUTER;
+  for (const r of rx) { L.sidewalks.push({ x0: r.p - r.w / 2 - SIDEWALK, x1: r.p - r.w / 2, z0: -E, z1: E }); L.sidewalks.push({ x0: r.p + r.w / 2, x1: r.p + r.w / 2 + SIDEWALK, z0: -E, z1: E }); }
+  for (const r of rz) { L.sidewalks.push({ z0: r.p - r.w / 2 - SIDEWALK, z1: r.p - r.w / 2, x0: -E, x1: E }); L.sidewalks.push({ z0: r.p + r.w / 2, z1: r.p + r.w / 2 + SIDEWALK, x0: -E, x1: E }); }
 
   // blocks
   const types = [['buildings', 50], ['collapsed', 14], ['park', 12], ['parking', 10], ['camp', 9], ['yard', 6]];
@@ -54,6 +56,7 @@ export function generateLayout(seed) {
 
   for (const b of L.blocks) fillBlock(L, b, rng.fork('b' + b.x0 + ',' + b.z0));
   decorateRoads(L, rng.fork('roads'));
+  buildOuterRing(L, rng.fork('outer'));
   return L;
 }
 
@@ -104,7 +107,7 @@ function fillBlock(L, b, rng) {
     for (let i = 0; i < nt * 1.5; i++) P.push({ type: 'bush', x: rng.range(b.x0 + 1, b.x1 - 1), z: rng.range(b.z0 + 1, b.z1 - 1), s: rng.range(0.7, 1.5), seed: rng.int(1, 1e9) });
     for (let i = 0; i < rng.int(1, 4); i++) P.push({ type: 'bench', x: rng.range(b.x0 + 3, b.x1 - 3), z: rng.range(b.z0 + 3, b.z1 - 3), rot: rng.pick([0, Math.PI / 2]) + rng.range(-0.2, 0.2) });
     if (rng.chance(0.5)) P.push({ type: 'fire', x: (b.x0 + b.x1) / 2 + rng.range(-4, 4), z: (b.z0 + b.z1) / 2 + rng.range(-4, 4), s: 1.2, campfire: true });
-    for (let i = 0; i < rng.int(1, 3); i++) P.push({ type: 'car', x: rng.range(b.x0 + 4, b.x1 - 4), z: rng.range(b.z0 + 4, b.z1 - 4), rot: rng.range(0, 6.28), variant: rng.int(0, 2), paint: 5, burnt: true, seed: rng.int(1, 1e9) });
+    for (let i = 0; i < rng.int(1, 3); i++) P.push({ type: 'car', x: rng.range(b.x0 + 4, b.x1 - 4), z: rng.range(b.z0 + 4, b.z1 - 4), rot: rng.range(0, 6.28), variant: rng.weighted([[0, 3], [3, 2], [2, 1]]), paint: 0, burnt: true, seed: rng.int(1, 1e9) });
   } else if (b.type === 'parking') {
     L.decals.push({ kind: 'parkinglot', ...b });
     const alongX = w >= d;
@@ -116,7 +119,7 @@ function fillBlock(L, b, rng) {
         if (!rng.chance(0.42)) continue;
         const along = (alongX ? b.x0 : b.x0) + s;
         const px = alongX ? b.x0 + s : cross, pz = alongX ? cross : b.z0 + s;
-        P.push({ type: 'car', x: px + rng.range(-0.3, 0.3), z: pz + rng.range(-0.4, 0.4), rot: (alongX ? Math.PI / 2 : 0) + rng.range(-0.25, 0.25) + (rng.chance(0.5) ? Math.PI : 0), variant: rng.int(0, 2), paint: rng.int(0, 5), burnt: rng.chance(0.25), seed: rng.int(1, 1e9) });
+        P.push({ type: 'car', x: px + rng.range(-0.3, 0.3), z: pz + rng.range(-0.4, 0.4), rot: (alongX ? Math.PI / 2 : 0) + rng.range(-0.25, 0.25) + (rng.chance(0.5) ? Math.PI : 0), variant: rng.weighted([[0, 4], [3, 3], [1, 1], [2, 1]]), paint: rng.int(0, 8), burnt: rng.chance(0.25), seed: rng.int(1, 1e9) });
       }
     }
     for (let i = 0; i < 2; i++) P.push({ type: 'lamp', x: rng.range(b.x0 + 3, b.x1 - 3), z: rng.range(b.z0 + 3, b.z1 - 3), rot: rng.range(0, 6.28), working: rng.chance(0.6), bent: rng.chance(0.3) });
@@ -169,20 +172,35 @@ function decorateRoads(L, rng) {
   for (const r of zs) { const cuts = [-HALF, ...xs.map((x) => x.p), HALF]; for (let i = 0; i < cuts.length - 1; i++) segs.push({ axis: 'x', c: r.p, w: r.w, a: cuts[i] + (i ? xs[i - 1].w / 2 : 0), b: cuts[i + 1] - (i < xs.length ? xs[i].w / 2 : 0) }); }
   const at = (s, along, lat) => (s.axis === 'z' ? { x: s.c + lat, z: along } : { x: along, z: s.c + lat });
   const rotAlong = (s) => (s.axis === 'z' ? 0 : Math.PI / 2);
+  const carVariant = (main) => rng.weighted([[0, 5], [3, 3], [1, 2], [2, 2], [4, main ? 1.2 : 0.5], [5, main ? 0.6 : 0]]);
+  const car = (p, rot, main, extra = {}) => P.push({ type: 'car', ...p, rot, variant: carVariant(main), paint: rng.int(0, 8), burnt: rng.chance(0.3), flipped: rng.chance(0.05), seed: rng.int(1, 1e9), ...extra });
   for (const s of segs) {
     const len = s.b - s.a; if (len < 6) continue;
-    // cars
-    const nc = rng.int(0, Math.ceil(len / 9));
+    const main = s.w >= 9;
+    const median = main && len > 14 && rng.chance(0.45);
+    // cars: scattered wrecks + occasional abandoned traffic jam along one lane
+    const nc = rng.int(1, Math.ceil(len / 8));
     for (let i = 0; i < nc; i++) {
       const along = rng.range(s.a + 3, s.b - 3), lat = rng.range(-s.w / 2 + 1.3, s.w / 2 - 1.3);
-      const p = at(s, along, lat);
       const crashed = rng.chance(0.3);
-      P.push({ type: 'car', ...p, rot: rotAlong(s) + (rng.chance(0.5) ? Math.PI : 0) + (crashed ? rng.range(-1.2, 1.2) : rng.range(-0.2, 0.2)), variant: rng.weighted([[0, 5], [1, 2], [2, 2]]), paint: rng.int(0, 5), burnt: rng.chance(0.3), flipped: rng.chance(0.06), seed: rng.int(1, 1e9) });
+      car(at(s, along, median && Math.abs(lat) < 1.6 ? Math.sign(lat || 1) * 2.2 : lat), rotAlong(s) + (rng.chance(0.5) ? Math.PI : 0) + (crashed ? rng.range(-1.2, 1.2) : rng.range(-0.2, 0.2)), main);
+    }
+    if (len > 16 && rng.chance(0.35)) {
+      const lane = rng.sign() * s.w * 0.25, dir = lane > 0 ? 0 : Math.PI;
+      for (let a = s.a + 3 + rng.range(0, 3); a < s.b - 4; a += rng.range(5.8, 7.5)) if (rng.chance(0.75)) car(at(s, a, lane + rng.range(-0.3, 0.3)), rotAlong(s) + dir + rng.range(-0.12, 0.12), main);
+    }
+    if (median) {
+      for (let a = s.a + 2; a < s.b - 2; a += 2.7) { if (rng.chance(0.12)) { a += 2; continue; } P.push({ type: 'jersey', ...at(s, a + 1.3, rng.range(-0.08, 0.08)), rot: rotAlong(s) + Math.PI / 2 + rng.range(-0.05, 0.05), len: 2.6 }); }
     }
     // debris / rubble piles partially blocking road
-    if (rng.chance(0.45)) { const p = at(s, rng.range(s.a + 2, s.b - 2), rng.range(-s.w / 2, s.w / 2) * 0.6); P.push({ type: 'rubblePile', ...p, s: rng.range(1, 2.4), seed: rng.int(1, 1e9) }); }
+    if (rng.chance(0.55)) { const p = at(s, rng.range(s.a + 2, s.b - 2), rng.range(-s.w / 2, s.w / 2) * 0.6); P.push({ type: 'rubblePile', ...p, s: rng.range(1, 2.4), seed: rng.int(1, 1e9) }); }
+    // loose road clutter (no or small colliders)
+    for (let i = 0; i < Math.ceil(len / 5); i++) {
+      const p = at(s, rng.range(s.a + 1, s.b - 1), rng.range(-s.w / 2 + 0.5, s.w / 2 - 0.5));
+      P.push({ type: rng.weighted([['cone', 2], ['tires', 1], ['bags', 2], ['cardboard', 2], ['pallet', 1], ['crates', 1], ['tarp', 1], ['barrel', 1], ['mattress', 0.5], ['cart', 0.5]]), ...p, rot: rng.range(0, 6.28), seed: rng.int(1, 1e9) });
+    }
     // barricade line across road with a gap
-    if (rng.chance(0.18) && len > 12) {
+    if (rng.chance(0.22) && len > 12) {
       const along = rng.range(s.a + 4, s.b - 4), gap = rng.range(-s.w / 2 + 2, s.w / 2 - 2);
       const kind = rng.pick(['jersey', 'sandbags', 'planks']);
       for (let lat = -s.w / 2 + 1; lat < s.w / 2 - 0.5; lat += 2.6) {
@@ -192,9 +210,16 @@ function decorateRoads(L, rng) {
       }
     }
     // decals
-    for (let i = 0; i < Math.ceil(len / 6); i++) { const p = at(s, rng.range(s.a, s.b), rng.range(-s.w / 2, s.w / 2)); L.decals.push({ kind: rng.weighted([['crack', 4], ['oil', 2], ['puddle', 3], ['trash', 2], ['scorch', 1]]), ...p, s: rng.range(1.5, 5), rot: rng.range(0, 6.28) }); }
+    for (let i = 0; i < Math.ceil(len / 4); i++) { const p = at(s, rng.range(s.a, s.b), rng.range(-s.w / 2, s.w / 2)); L.decals.push({ kind: rng.weighted([['crack', 4], ['oil', 3], ['puddle', 3], ['trash', 2], ['scorch', 1], ['patch', 2], ['stain', 3], ['wet', 3], ['leaves', 1.5], ['paper', 2]]), ...p, s: rng.range(1.5, 5), rot: rng.range(0, 6.28) }); }
+    for (let i = 0; i < Math.ceil(len / 14); i++) { const p = at(s, rng.range(s.a, s.b), rng.range(-s.w / 2, s.w / 2) * 0.7); L.decals.push({ kind: 'wet', ...p, s: rng.range(5, 9), rot: rng.range(0, 6.28) }); }
+    if (rng.chance(0.6)) L.decals.push({ kind: 'manhole', ...at(s, rng.range(s.a + 2, s.b - 2), rng.range(-1.5, 1.5)), s: 1.0, rot: 0 });
+    for (const side of [-1, 1]) {
+      if (rng.chance(0.7)) L.decals.push({ kind: 'drain', ...at(s, rng.range(s.a + 2, s.b - 2), side * (s.w / 2 - 0.3)), s: 1.0, rot: rotAlong(s) + Math.PI / 2 });
+      for (let a = s.a + 1; a < s.b - 2; a += 4) if (rng.chance(0.85)) L.decals.push({ kind: 'edge', ...at(s, a + 2, side * (s.w / 2 - 0.7)), s: 1, sx: 0.8, sz: 4.1, rot: rotAlong(s) });
+    }
+    if (len > 14 && rng.chance(0.6)) for (const side of [-1, 1]) L.decals.push({ kind: 'arrow', ...at(s, side > 0 ? s.b - 5 : s.a + 5, side * s.w * 0.25), s: 1, sx: 1.0, sz: 3.0, rot: rotAlong(s) + (side > 0 ? 0 : Math.PI) });
     // center line dashes
-    for (let a = s.a + 2; a < s.b - 2; a += 4.5) { if (rng.chance(0.15)) continue; const p = at(s, a, 0); L.decals.push({ kind: 'dash', ...p, s: 2.2, rot: rotAlong(s), sx: 0.6 }); }
+    if (!median) for (let a = s.a + 2; a < s.b - 2; a += 4.5) { if (rng.chance(0.15)) continue; const p = at(s, a, 0); L.decals.push({ kind: 'dash', ...p, s: 2.2, rot: rotAlong(s), sx: 0.6 }); }
     // lamps along sidewalks
     for (let a = s.a + rng.range(2, 6); a < s.b - 2; a += rng.range(13, 18)) {
       const side = rng.sign(); const p = at(s, a, side * (s.w / 2 + 0.8));
@@ -210,11 +235,17 @@ function decorateRoads(L, rng) {
     if (rng.chance(0.38)) { const side = rng.sign(); const p = at(s, rng.range(s.a + 2, s.b - 2), side * (s.w / 2 + rng.range(-0.6, 1.2))); P.push({ type: 'barrel', ...p, burning: true }); }
     if (rng.chance(0.22)) { const p = at(s, rng.range(s.a + 2, s.b - 2), rng.range(-s.w / 2 + 1, s.w / 2 - 1)); P.push({ type: 'flare', ...p, rot: rng.range(0, 6.28) }); }
     if (rng.chance(0.12)) { const p = at(s, rng.range(s.a + 2, s.b - 2), rng.range(-s.w / 2 + 1, s.w / 2 - 1)); P.push({ type: 'fire', ...p, s: rng.range(0.7, 1.1), campfire: false, debris: true }); }
-    // sidewalk clutter
-    for (let i = 0; i < Math.ceil(len / 12); i++) {
-      const side = rng.sign(); const p = at(s, rng.range(s.a + 1, s.b - 1), side * (s.w / 2 + rng.range(0.6, 2)));
-      const t = rng.weighted([['barrel', 2], ['tires', 1], ['dumpster', 1], ['rubblePile', 2], ['bush', 2]]);
-      P.push({ type: t, ...p, rot: rng.range(0, 6.28), s: rng.range(0.6, 1.2), seed: rng.int(1, 1e9), burning: rng.chance(0.15) });
+    // sidewalk furniture: something every few metres, curb side or wall side
+    for (const side of [-1, 1]) {
+      for (let a = s.a + rng.range(0.5, 2); a < s.b - 0.8; a += rng.range(2.2, 4.2)) {
+        const t = rng.weighted([['hydrant', 1], ['newsbox', 1.2], ['trashcan', 2], ['bags', 3], ['cardboard', 2], ['bollard', 1.2], ['sign', 1.2], ['busstop', 0.35], ['phone', 0.3], ['planter', 0.8], ['bench', 0.5], ['crates', 0.8], ['pallet', 0.6], ['mattress', 0.4], ['cart', 0.3], ['tires', 0.6], ['barrel', 0.6], ['dumpster', 0.5], ['bush', 1]]);
+        const wall = ['bags', 'cardboard', 'crates', 'pallet', 'mattress', 'dumpster', 'bush', 'trashcan', 'phone'].includes(t) && rng.chance(0.7);
+        const lat = side * (s.w / 2 + (wall ? SIDEWALK - 0.45 : 0.45));
+        const p = at(s, a, lat);
+        const face = rotAlong(s) + (side > 0 ? Math.PI : 0); // local +x along street; +z toward road for side>0? (approx)
+        P.push({ type: t === 'sign' ? 'streetSign' : t, ...p, rot: ['busstop', 'bench', 'dumpster', 'newsbox', 'phone'].includes(t) ? face + Math.PI / 2 * side + Math.PI / 2 : rng.range(0, 6.28), s: rng.range(0.6, 1.2), seed: rng.int(1, 1e9), burning: rng.chance(0.12) });
+        if (t === 'busstop') a += 3;
+      }
     }
   }
   // intersections: crosswalks + traffic lights
@@ -222,9 +253,62 @@ function decorateRoads(L, rng) {
     if (rng.chance(0.75)) { L.decals.push({ kind: 'crosswalk', x: x.p, z: z.p - z.w / 2 - 1.6, s: x.w * 0.8, rot: 0, sx: 1, sy: 0.35 }); }
     if (rng.chance(0.75)) { L.decals.push({ kind: 'crosswalk', x: x.p - x.w / 2 - 1.6, z: z.p, s: z.w * 0.8, rot: Math.PI / 2, sx: 1, sy: 0.35 }); }
     if (rng.chance(0.5)) P.push({ type: 'trafficLight', x: x.p + (x.w / 2 + 0.9) * rng.sign(), z: z.p + (z.w / 2 + 0.9) * rng.sign(), rot: rng.pick([0, 1.57, 3.14, 4.71]), working: rng.chance(0.4) });
-    if (rng.chance(0.25)) P.push({ type: 'car', x: x.p + rng.range(-2, 2), z: z.p + rng.range(-2, 2), rot: rng.range(0, 6.28), variant: rng.int(0, 2), paint: rng.int(0, 5), burnt: true, seed: rng.int(1, 1e9) });
+    if (rng.chance(0.35)) P.push({ type: 'car', x: x.p + rng.range(-2, 2), z: z.p + rng.range(-2, 2), rot: rng.range(0, 6.28), variant: rng.weighted([[0, 3], [3, 2], [1, 1], [4, 1], [5, 0.5]]), paint: rng.int(0, 8), burnt: true, seed: rng.int(1, 1e9) });
+    if (rng.chance(0.5)) L.decals.push({ kind: 'manhole', x: x.p + rng.range(-2, 2), z: z.p + rng.range(-2, 2), s: 1, rot: 0 });
+    if (rng.chance(0.6)) L.decals.push({ kind: 'wet', x: x.p + rng.range(-3, 3), z: z.p + rng.range(-3, 3), s: rng.range(6, 10), rot: rng.range(0, 6) });
     if (rng.chance(0.2)) L.decals.push({ kind: 'scorch', x: x.p, z: z.p, s: rng.range(4, 7), rot: rng.range(0, 6) });
   }
+}
+
+// --- Outer ring: dense visual-only city that seals the map edge ----------------
+// Tall wrecked facades on the far (-x/-z, top of screen) sides; low ruins on the camera-facing sides so
+// they never hide the player. Every road leaving the square ends in a roadblock.
+function buildOuterRing(L, rng) {
+  const E = HALF + OUTER, B = HALF + 6;
+  L.outer = []; L.outerRoads = []; L.roadblocks = [];
+  const ext = (inner) => { // continue the road rhythm outward on both sides
+    const lo = [], hi = [];
+    let p = (inner.length ? inner[0].p : 0) - rng.range(26, 34); while (p > -E + 6) { if (p < -B - 6) lo.push({ p, w: rng.range(6.5, 8.5) }); p -= rng.range(24, 32); }
+    p = (inner.length ? inner[inner.length - 1].p : 0) + rng.range(26, 34); while (p < E - 6) { if (p > B + 6) hi.push({ p, w: rng.range(6.5, 8.5) }); p += rng.range(24, 32); }
+    return [...lo.reverse(), ...inner, ...hi];
+  };
+  const ax = ext(L.roadsX), az = ext(L.roadsZ);
+  for (const r of ax) if (!L.roadsX.includes(r)) L.outerRoads.push({ axis: 'z', x: r.p, w: r.w });
+  for (const r of az) if (!L.roadsZ.includes(r)) L.outerRoads.push({ axis: 'x', z: r.p, w: r.w });
+  const iv = (roads) => {
+    const out = []; let a = -E;
+    for (const r of roads) { out.push([a, r.p - r.w / 2 - SIDEWALK]); a = r.p + r.w / 2 + SIDEWALK; }
+    out.push([a, E]);
+    const split = [];
+    for (const [u, v] of out) { // split at the playable border so inner cells stay owned by the main generator
+      const cuts = [u, ...[-B, B].filter((c) => c > u + 0.5 && c < v - 0.5), v];
+      for (let i = 0; i < cuts.length - 1; i++) split.push([cuts[i], cuts[i + 1]]);
+    }
+    return split.filter(([u, v]) => v - u > 5);
+  };
+  const ix = iv(ax), iz = iv(az);
+  for (const [x0, x1] of ix) for (const [z0, z1] of iz) {
+    const inner = x0 >= -B - 0.01 && x1 <= B + 0.01 && z0 >= -B - 0.01 && z1 <= B + 0.01;
+    if (inner) continue;
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    const near = cx > B || cz > B; // camera-facing side -> keep low
+    const dist = Math.max(Math.abs(cx), Math.abs(cz)) - B;
+    // subdivide the block into frontage lots
+    const alongX = x1 - x0 >= z1 - z0, len = alongX ? x1 - x0 : z1 - z0;
+    let t = 0;
+    while (t < len - 3) {
+      const lw = Math.min(len - t, rng.range(7, 14));
+      const lot = alongX ? { x0: x0 + t, x1: x0 + t + lw, z0, z1 } : { x0, x1, z0: z0 + t, z1: z0 + t + lw };
+      t += lw + rng.range(0, 1.2);
+      let floors;
+      if (near) floors = dist < 14 ? rng.weighted([[0, 3], [1, 3], [2, 2]]) : rng.int(1, 4);
+      else floors = rng.weighted([[3, 1], [4, 2], [5, 3], [7, 3], [9, 2], [12, 1]]) + (dist > 20 ? rng.int(0, 3) : 0);
+      L.outer.push({ ...lot, floors, style: rng.weighted([['concrete', 4], ['brick', 3], ['plaster', 2]]), tint: rng.pick([0xffffff, 0xe8e0d4, 0xd0d4d8, 0xc8bcb0, 0xb8b0a4]), broken: rng.chance(0.45), near, seed: rng.int(1, 1e9) });
+    }
+  }
+  // roadblocks where playable roads leave the square
+  for (const r of L.roadsX) for (const side of [-1, 1]) L.roadblocks.push({ axis: 'z', c: r.p, w: r.w, at: side * (HALF + 2.5), side, kind: rng.weighted([['containers', 3], ['bus', 2], ['rubble', 2], ['jersey', 2]]), seed: rng.int(1, 1e9) });
+  for (const r of L.roadsZ) for (const side of [-1, 1]) L.roadblocks.push({ axis: 'x', c: r.p, w: r.w, at: side * (HALF + 2.5), side, kind: rng.weighted([['containers', 3], ['bus', 2], ['rubble', 2], ['jersey', 2]]), seed: rng.int(1, 1e9) });
 }
 
 // --- Population (after colliders + nav exist) ------------------------------

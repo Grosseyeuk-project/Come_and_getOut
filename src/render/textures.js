@@ -405,6 +405,46 @@ export function decal(kind) {
     g.fillStyle = 'rgba(210,180,90,0.85)'; g.fillRect(100, 0, 56, 256);
     g.globalCompositeOperation = 'destination-out';
     for (let i = 0; i < 500; i++) { g.fillStyle = `rgba(0,0,0,${rng.range(0.3, 1)})`; g.beginPath(); g.arc(rng.range(90, 166), rng.range(0, 256), rng.range(1, 7), 0, 7); g.fill(); }
+  } else if (kind === 'manhole' || kind === 'drain') {
+    const id = g.createImageData(S, S);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const dx = x / S - 0.5, dy = y / S - 0.5, r = Math.hypot(dx, dy) * 2, i = (y * S + x) * 4;
+      let a = 0, v = 0;
+      if (kind === 'manhole') {
+        if (r < 0.86) { v = 34 + ((Math.floor((dx + 1) * 14) + Math.floor((dy + 1) * 14)) % 2) * 10 + fbm(x / 12, y / 12, 3, 5) * 20; a = 1; if (Math.abs(r - 0.8) < 0.03 || Math.abs(r - 0.45) < 0.02) v = 18; }
+        else if (r < 0.98) { v = 22; a = (0.98 - r) * 8; }
+      } else {
+        if (Math.abs(dx) < 0.42 && Math.abs(dy) < 0.24) { const slot = (Math.abs(dx) * 22) % 1 < 0.45 && Math.abs(dy) < 0.19; v = slot ? 6 : 40; a = 1; }
+      }
+      const rust = fbm(x / 20, y / 20, 3, 9) > 0.6 ? 1 : 0;
+      id.data[i] = v + rust * 18; id.data[i + 1] = v + rust * 6; id.data[i + 2] = v; id.data[i + 3] = clamp(a, 0, 1) * 255;
+    }
+    g.putImageData(id, 0, 0);
+  } else if (kind === 'patch' || kind === 'stain' || kind === 'wet') {
+    const id = g.createImageData(S, S);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const dx = Math.abs(x / S - 0.5) * 2, dy = Math.abs(y / S - 0.5) * 2, i = (y * S + x) * 4, n = fbm(x / 30, y / 30, 4, hashKind(kind));
+      let a;
+      if (kind === 'patch') { const e = Math.max(dx, dy) + (n - 0.5) * 0.12; a = e < 0.9 ? 0.92 : 0; const v = 16 + n * 16 + (hash2(x, y, 3) > 0.9 ? 10 : 0); id.data[i] = v; id.data[i + 1] = v; id.data[i + 2] = v + 2; if (Math.abs(e - 0.88) < 0.025) { id.data[i] = id.data[i + 1] = id.data[i + 2] = 8; a = 1; } }
+      else { const r = Math.hypot(dx, dy); a = clamp((1 - r) * 1.6 + (n - 0.5) * 2.4 - 0.2, 0, 1) * (kind === 'wet' ? 0.55 : 0.6); const v = kind === 'wet' ? 10 : 14 + n * 8; id.data[i] = v; id.data[i + 1] = v * 0.95; id.data[i + 2] = v * 0.9; }
+      id.data[i + 3] = a * 255;
+    }
+    g.putImageData(id, 0, 0);
+  } else if (kind === 'arrow' || kind === 'edge') {
+    g.fillStyle = kind === 'arrow' ? 'rgba(220,216,200,0.85)' : 'rgba(215,212,195,0.8)';
+    if (kind === 'arrow') { g.fillRect(112, 90, 32, 160); g.beginPath(); g.moveTo(70, 100); g.lineTo(128, 6); g.lineTo(186, 100); g.fill(); }
+    else g.fillRect(108, 0, 40, 256);
+    g.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 600; i++) { g.fillStyle = `rgba(0,0,0,${rng.range(0.3, 1)})`; g.beginPath(); g.arc(rng.range(60, 196), rng.range(0, 256), rng.range(1, 6), 0, 7); g.fill(); }
+  } else if (kind === 'leaves' || kind === 'paper') {
+    for (let i = 0; i < (kind === 'leaves' ? 260 : 26); i++) {
+      const r2 = Math.sqrt(rng.next()) * 110, a2 = rng.range(0, 6.3);
+      const x = 128 + Math.cos(a2) * r2, y = 128 + Math.sin(a2) * r2;
+      g.save(); g.translate(x, y); g.rotate(rng.range(0, 6.3));
+      if (kind === 'leaves') { const d = rng.next(); g.fillStyle = `rgba(${70 + d * 60},${45 + d * 30},${20 + d * 10},0.9)`; g.beginPath(); g.ellipse(0, 0, rng.range(3, 7), rng.range(1.5, 3.5), 0, 0, 7); g.fill(); }
+      else { const v = rng.int(140, 210); g.fillStyle = `rgba(${v},${v - 6},${v - 18},0.92)`; g.fillRect(-rng.range(4, 12), -rng.range(3, 9), rng.range(8, 22), rng.range(6, 16)); g.fillStyle = 'rgba(40,36,30,0.4)'; g.fillRect(-4, -2, 8, 1.5); }
+      g.restore();
+    }
   } else if (kind === 'crack') {
     const m = crackMask(S, rng, 4, 1.3, 45);
     const id = g.createImageData(S, S);
@@ -468,4 +508,215 @@ export function muzzleTex() {
   spike(0, 210, 14); spike(0.5, 70, 8); spike(-0.5, 70, 8); spike(1.4, 40, 6); spike(-1.4, 40, 6); spike(Math.PI, 30, 6);
   cache.muzzle = toTex(c, true, false);
   return cache.muzzle;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Environment-art kit textures (vehicles, facades, signage, posters, shutters)
+// ---------------------------------------------------------------------------------------------
+
+// Vehicle paint: mostly clean dielectric paint, scratches, grime rising from the sills, sparse rust
+// blisters around panel seams. UVs are shape-space metres (extrude) so 1 tile ~ 1 m.
+export function carPaint(key, paint = [0.4, 0.4, 0.4]) {
+  const k = 'car_' + key;
+  if (cache[k]) return cache[k];
+  const S = 256, rng = new RNG(hashKind(key));
+  const scratches = crackMask(S, rng, 14, 0.6, 18);
+  cache[k] = genPBR(S, (u, v, x, y, o) => {
+    const i = y * S + x;
+    const n = tn(u, v, 2, 3, 201), d = tn(u, v, 8, 4, 202), f = hash2(x, y, 203);
+    const rs = tn(u, v, 5, 4, 204);
+    const rust = clamp((rs - 0.7) * 6, 0, 1);
+    const grime = clamp((d - 0.45) * 1.6, 0, 1) * 0.5;
+    const s = scratches[i];
+    const tone = 0.92 + n * 0.14;
+    let r = paint[0] * tone, g = paint[1] * tone, b = paint[2] * tone;
+    r = r * (1 - grime) + 0.11 * grime; g = g * (1 - grime) + 0.1 * grime; b = b * (1 - grime) + 0.085 * grime;
+    r += s * 0.18; g += s * 0.18; b += s * 0.18; // bare metal in scratches
+    const rr = 0.2 + f * 0.08, rg = 0.09 + f * 0.04, rb = 0.045;
+    o.r = r * (1 - rust) + rr * rust; o.g = g * (1 - rust) + rg * rust; o.b = b * (1 - rust) + rb * rust;
+    o.h = 0.5 + rust * 0.35 * f - s * 0.2; o.ro = 0.32 + grime * 0.5 + rust * 0.55 + s * 0.2 + f * 0.04; o.m = s * 0.8;
+  }, 2.0, { metal: true });
+  return cache[k];
+}
+export function burntMetal() {
+  if (cache.burnt) return cache.burnt;
+  const S = 256;
+  cache.burnt = genPBR(S, (u, v, x, y, o) => {
+    const n = tn(u, v, 3, 5, 211), r = tn(u, v, 10, 4, 212), f = hash2(x, y, 213), ash = tn(u, v, 6, 3, 214);
+    const rust = clamp((n - 0.42) * 3, 0, 1);
+    let cr = 0.035 + f * 0.02, cg = 0.032 + f * 0.018, cb = 0.03 + f * 0.016;
+    const rr = 0.22 * (0.6 + r * 0.6), rg = 0.085 * (0.6 + r * 0.6), rb = 0.035;
+    cr = cr * (1 - rust) + rr * rust; cg = cg * (1 - rust) + rg * rust; cb = cb * (1 - rust) + rb * rust;
+    const a = clamp((ash - 0.62) * 4, 0, 1) * 0.6;
+    o.r = cr * (1 - a) + 0.32 * a; o.g = cg * (1 - a) + 0.31 * a; o.b = cb * (1 - a) + 0.29 * a;
+    o.h = 0.5 + r * 0.4 * rust + f * 0.1; o.ro = 0.75 + rust * 0.2; o.m = 0.3 * (1 - rust);
+  }, 3.0, { metal: true });
+  return cache.burnt;
+}
+
+// Distant facade atlas: 4 bays x 4 floors per tile, window frames, some lit/broken/boarded.
+// Returns { map, normalMap, roughnessMap, emissiveMap }.
+export function facade(style = 'concrete') {
+  const k = 'facade_' + style;
+  if (cache[k]) return cache[k];
+  const S = 512, BX = 4, BY = 4, rng = new RNG(hashKind(style));
+  const cells = [];
+  for (let j = 0; j < BY; j++) for (let i = 0; i < BX; i++) cells.push(rng.weighted([['dark', 9], ['lit', 2], ['litCold', 1], ['broken', 2], ['boarded', 1], ['wall', 1]]));
+  const base = style === 'brick' ? [0.3, 0.15, 0.1] : style === 'plaster' ? [0.42, 0.38, 0.32] : [0.34, 0.33, 0.31];
+  const em = new Float32Array(S * S * 3);
+  const tex = genPBR(S, (u, v, x, y, o) => {
+    const fx = u * BX, fy = v * BY, ci = Math.floor(fx), cj = Math.floor(fy), lx = fx - ci, ly = fy - cj;
+    const cell = cells[cj * BX + ci];
+    const n = tn(u, v, 4, 4, 221), f = hash2(x, y, 222);
+    const streak = vnoise(u * 60, v * 3, 223, 60) * 0.5;
+    const winX = lx > 0.2 && lx < 0.8, winY = ly > 0.22 && ly < 0.78;
+    const frame = winX && winY && (lx < 0.24 || lx > 0.76 || ly < 0.26 || ly > 0.74 || Math.abs(lx - 0.5) < 0.015);
+    const sill = winX && ly > 0.78 && ly < 0.82;
+    const band = ly < 0.05;
+    let r = base[0], g = base[1], b = base[2];
+    if (style === 'brick' && !band) { const row = Math.floor(v * 128), off = row % 2 ? 0.5 : 0; const bx = (u * 32 + off) % 1; if (bx < 0.08 || (v * 128) % 1 < 0.15) { r = g = b = 0.2; } else { const id = hash2(Math.floor(u * 32 + off), row, 5); r *= 0.8 + id * 0.4; g *= 0.8 + id * 0.4; b *= 0.8 + id * 0.4; } }
+    const k2 = (0.85 + n * 0.3) * (1 - streak * 0.5);
+    r *= k2; g *= k2; b *= k2;
+    o.h = 0.6 + n * 0.1; o.ro = 0.9;
+    let e = [0, 0, 0];
+    if (band) { r = g = b = 0.32 * k2; o.h = 0.8; }
+    if (winX && winY && cell !== 'wall' && !frame) {
+      o.h = 0.1; o.ro = 0.2;
+      if (cell === 'boarded') { const p = (lx * 6) % 1; r = 0.2 + p * 0.06; g = 0.14 + p * 0.04; b = 0.09; o.ro = 0.9; o.h = 0.4 + p * 0.1; }
+      else if (cell === 'lit' || cell === 'litCold') {
+        const flick = 0.6 + 0.4 * vnoise(lx * 3, ly * 3, ci + cj * 7);
+        const blind = (ly * 18) % 1 < 0.2 && hash2(ci, cj, 9) > 0.5 ? 0.5 : 1;
+        e = cell === 'lit' ? [1.0 * flick * blind, 0.58 * flick * blind, 0.25 * flick * blind] : [0.35 * flick, 0.65 * flick, 0.9 * flick];
+        r = g = b = 0.05;
+      } else if (cell === 'broken') { const shard = hash2(Math.floor(lx * 9), Math.floor(ly * 7), ci * 13 + cj) > 0.6; r = g = b = shard ? 0.09 : 0.015; o.ro = shard ? 0.1 : 0.9; }
+      else { const refl = 0.04 + (1 - ly) * 0.05 + f * 0.01; r = refl; g = refl * 1.05; b = refl * 1.15; }
+    }
+    if (frame && cell !== 'wall') { r = 0.08; g = 0.08; b = 0.085; o.h = 0.7; o.ro = 0.6; }
+    if (sill && cell !== 'wall') { r *= 1.2; g *= 1.2; b *= 1.2; o.h = 0.9; }
+    o.r = r; o.g = g; o.b = b;
+    const i = (y * S + x) * 3; em[i] = e[0]; em[i + 1] = e[1]; em[i + 2] = e[2];
+  }, 2.0);
+  const ec = canvas(S), eg = ec.getContext('2d'), eid = eg.createImageData(S, S);
+  for (let i = 0; i < S * S; i++) { eid.data[i * 4] = clamp(em[i * 3], 0, 1) * 255; eid.data[i * 4 + 1] = clamp(em[i * 3 + 1], 0, 1) * 255; eid.data[i * 4 + 2] = clamp(em[i * 3 + 2], 0, 1) * 255; eid.data[i * 4 + 3] = 255; }
+  eg.putImageData(eid, 0, 0);
+  tex.emissiveMap = toTex(ec, true);
+  cache[k] = tex;
+  return tex;
+}
+
+// Neon / shop sign atlas: 4 cols x 4 rows, each cell 256x128. map = dark backing + tubes, emissive = tubes.
+export const SIGN_WORDS = [
+  ['MOTEL', '#ff3070'], ['BAR', '#30e0ff'], ['24/7', '#ffd040'], ['PHARMACY', '#40ff80'],
+  ['HOTEL', '#ff5030'], ['LIQUOR', '#ff40c0'], ['OPEN', '#ff3030'], ['PAWN', '#ffb020'],
+  ['NOODLES', '#ff6040'], ['CLINIC', '#60c0ff'], ['GUNS', '#ff4020'], ['DINER', '#40f0d0'],
+  ['+', '#30ff60'], ['XXX', '#ff30a0'], ['RADIO', '#a070ff'], ['GARAGE', '#ffa030'],
+];
+function mixWhite(hex, k) { const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255; return `rgb(${r + (255 - r) * k | 0},${g + (255 - g) * k | 0},${b + (255 - b) * k | 0})`; }
+export function signAtlas() {
+  if (cache.signs) return cache.signs;
+  const CW = 256, CH = 128, W = CW * 4, H = CH * 4;
+  const c = canvas(W, H), g = c.getContext('2d'), ec = canvas(W, H), e = ec.getContext('2d'), rng = new RNG(4242);
+  g.fillStyle = '#0a0a0c'; g.fillRect(0, 0, W, H); e.fillStyle = '#000'; e.fillRect(0, 0, W, H);
+  SIGN_WORDS.forEach(([word, col], k) => {
+    const cx = (k % 4) * CW, cy = Math.floor(k / 4) * CH;
+    // backing board
+    g.fillStyle = `rgb(${18 + rng.int(0, 14)},${18 + rng.int(0, 10)},${20 + rng.int(0, 10)})`; g.fillRect(cx + 4, cy + 4, CW - 8, CH - 8);
+    g.strokeStyle = '#2a2a2e'; g.lineWidth = 6; g.strokeRect(cx + 7, cy + 7, CW - 14, CH - 14);
+    for (let i = 0; i < 60; i++) { g.fillStyle = `rgba(${90 + rng.int(0, 40)},${40 + rng.int(0, 20)},20,${rng.range(0.1, 0.4)})`; g.fillRect(cx + rng.range(4, CW - 10), cy + rng.range(4, CH - 10), rng.range(2, 10), rng.range(2, 8)); }
+    const fs = word.length > 6 ? 46 : word.length > 4 ? 58 : 72;
+    for (const ctx of [g, e]) {
+      ctx.save(); ctx.font = `bold ${fs}px "Arial Black", Impact, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineJoin = 'round'; ctx.strokeStyle = col; ctx.lineWidth = 5; ctx.shadowColor = col; ctx.shadowBlur = ctx === e ? 14 : 4;
+      if (word === '+') { ctx.lineWidth = 16; ctx.beginPath(); ctx.moveTo(cx + 128, cy + 22); ctx.lineTo(cx + 128, cy + 106); ctx.moveTo(cx + 86, cy + 64); ctx.lineTo(cx + 170, cy + 64); ctx.stroke(); }
+      else ctx.strokeText(word, cx + CW / 2, cy + CH / 2 + 2);
+      ctx.shadowBlur = 0; ctx.strokeStyle = ctx === e ? mixWhite(col, 0.45) : col; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.8;
+      if (word !== '+') ctx.strokeText(word, cx + CW / 2, cy + CH / 2 + 2);
+      ctx.restore();
+    }
+    // dead tube segments
+    e.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < rng.int(0, 2); i++) e.fillRect(cx + rng.range(20, CW - 60), cy + 10, rng.range(14, 40), CH - 20);
+    e.globalCompositeOperation = 'source-over';
+  });
+  cache.signs = { map: toTex(c, true, false), emissiveMap: toTex(ec, true, false) };
+  return cache.signs;
+}
+
+// Paper posters / bills atlas (4x2 cells), alpha-torn edges.
+export function posterAtlas() {
+  if (cache.posters) return cache.posters;
+  const CW = 128, CH = 192, W = CW * 4, H = CH * 2, c = canvas(W, H), g = c.getContext('2d'), rng = new RNG(777);
+  const heads = ['WANTED', 'MISSING', 'OBEY', 'VOTE', 'EVACUATE', 'RATIONS', 'REWARD', 'NO ENTRY'];
+  for (let k = 0; k < 8; k++) {
+    const cx = (k % 4) * CW, cy = Math.floor(k / 4) * CH;
+    const paper = rng.pick(['#cfc6ae', '#d8cca0', '#b8b4a8', '#c89a6a', '#a8382c', '#d0c8b8']);
+    g.fillStyle = paper; g.fillRect(cx + 6, cy + 6, CW - 12, CH - 12);
+    g.fillStyle = paper === '#a8382c' ? '#f0e8d8' : '#1a1612';
+    g.font = 'bold 22px Impact, "Arial Black", sans-serif'; g.textAlign = 'center';
+    g.fillText(heads[k], cx + CW / 2, cy + 34);
+    if (k % 2 === 0) { g.fillStyle = 'rgba(20,18,14,0.75)'; g.fillRect(cx + 26, cy + 46, CW - 52, 70); g.fillStyle = 'rgba(200,190,170,0.4)'; g.beginPath(); g.arc(cx + CW / 2, cy + 72, 16, 0, 7); g.fill(); g.fillRect(cx + CW / 2 - 22, cy + 90, 44, 26); }
+    else { g.beginPath(); g.fillStyle = 'rgba(20,18,14,0.8)'; g.arc(cx + CW / 2, cy + 82, 30, 0, 7); g.fill(); }
+    g.fillStyle = 'rgba(20,18,14,0.6)';
+    for (let l = 0; l < 5; l++) g.fillRect(cx + 18, cy + 130 + l * 9, CW - 36 - rng.range(0, 30), 4);
+    // stains + tears
+    for (let i = 0; i < 30; i++) { g.fillStyle = `rgba(60,45,25,${rng.range(0.05, 0.25)})`; g.beginPath(); g.arc(cx + rng.range(6, CW - 6), cy + rng.range(6, CH - 6), rng.range(3, 16), 0, 7); g.fill(); }
+    g.save(); g.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 9; i++) { g.beginPath(); const ex = rng.chance(0.5) ? cx + rng.range(0, CW) : cx + (rng.chance(0.5) ? 6 : CW - 6); const ey = cy + rng.range(0, CH); g.moveTo(ex, ey); for (let q = 0; q < 5; q++) g.lineTo(ex + rng.range(-22, 22), ey + rng.range(-22, 22)); g.fill(); }
+    g.restore();
+  }
+  const t = cardTex(c); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  cache.posters = t;
+  return t;
+}
+
+// Rolling shutter / corrugated door: horizontal slats, rust, graffiti scuffs.
+export function shutter() {
+  if (cache.shutter) return cache.shutter;
+  const S = 256;
+  cache.shutter = genPBR(S, (u, v, x, y, o) => {
+    const sl = (v * 24) % 1, groove = sl < 0.12;
+    const n = tn(u, v, 4, 4, 231), r = tn(u, v, 8, 4, 232), f = hash2(x, y, 233);
+    const rust = clamp((r + (1 - v) * 0.25 - 0.62) * 4, 0, 1);
+    const b = groove ? 0.12 : 0.36 + n * 0.12 + Math.sin(sl * Math.PI) * 0.05;
+    o.r = b * (1 - rust) + 0.26 * rust; o.g = b * 1.0 * (1 - rust) + 0.12 * rust; o.b = b * 1.04 * (1 - rust) + 0.06 * rust;
+    o.h = groove ? 0.1 : 0.5 + Math.sin(sl * Math.PI) * 0.3; o.ro = 0.55 + rust * 0.4 + f * 0.05; o.m = 0.6 * (1 - rust);
+  }, 3.0, { metal: true });
+  return cache.shutter;
+}
+
+// Rooftop tar / gravel
+export function roofing() {
+  if (cache.roofing) return cache.roofing;
+  const S = 256;
+  cache.roofing = genPBR(S, (u, v, x, y, o) => {
+    const n = tn(u, v, 4, 4, 241), f = hash2(x, y, 242), p = vnoise(u * 48, v * 48, 243, 48);
+    const wet = tn(u, v, 2, 3, 244) > 0.62;
+    const b = 0.13 + n * 0.08 + (p > 0.7 ? 0.08 : 0) + (f - 0.5) * 0.04;
+    o.r = b; o.g = b * 0.98; o.b = b * 0.95; o.h = 0.4 + p * 0.4; o.ro = wet ? 0.25 : 0.92;
+  }, 2.0);
+  return cache.roofing;
+}
+
+// Shipping container / painted sheet metal: vertical ribs, paint with rust bleeding down from the top
+// edge and seams, faded stencil-ish blocks. 1 tile ~ 3 m with boxUV 0.33.
+export function paintedSheet(key, paint) {
+  const k = 'sheet_' + key;
+  if (cache[k]) return cache[k];
+  const S = 512, ribs = 12;
+  cache[k] = genPBR(S, (u, v, x, y, o) => {
+    const rp = (u * ribs) % 1, rib = Math.sin(rp * Math.PI * 2) * 0.5 + 0.5;
+    const n = tn(u, v, 3, 4, 251), f = hash2(x, y, 252);
+    const streak = vnoise(u * 90, v * 3, 253, 90) * vnoise(u * 20, v * 1.5, 254, 20);
+    const topBleed = clamp((v - 0.72) * 3, 0, 1); // canvas v=0 is top after flip? genPBR v grows downward in canvas = up in UV
+    const rustN = tn(u, v, 7, 4, 255);
+    const rust = clamp((rustN - 0.66) * 5 + streak * 1.2 * (0.4 + topBleed) - 0.25, 0, 1);
+    const fade = 0.85 + n * 0.25 - streak * 0.25;
+    let r = paint[0] * fade, g = paint[1] * fade, b = paint[2] * fade;
+    const dent = rib * 0.12;
+    r *= 0.92 + dent; g *= 0.92 + dent; b *= 0.92 + dent;
+    const rr = 0.2 + f * 0.07 + rustN * 0.08, rg = 0.085 + f * 0.03, rb = 0.04;
+    o.r = r * (1 - rust) + rr * rust; o.g = g * (1 - rust) + rg * rust; o.b = b * (1 - rust) + rb * rust;
+    o.h = rib * 0.7 + rust * 0.15 * f; o.ro = 0.5 + rust * 0.42 + streak * 0.1; o.m = 0.15 * (1 - rust);
+  }, 3.5, { metal: true });
+  return cache[k];
 }
