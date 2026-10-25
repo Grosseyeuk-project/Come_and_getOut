@@ -117,14 +117,14 @@ export class HUD {
   // crits spawn their own larger yellow number. Numbers rise on an arc and fade.
   damageNumber(x, y, z, dmg, crit, src = null) {
     const now = this.dnClock || 0;
-    if (src && !crit) {
-      const d = this.dns.find((d) => d.src === src && !d.crit && now - d.last < 0.45 && d.t < 0.8);
+    if (src) {
+      const d = this.dns.find((d) => d.src === src && d.crit === !!crit && now - d.last < 0.45 && d.t < 0.8);
       if (d) { d.val += dmg; d.last = now; d.t = Math.min(d.t, 0.15); d.pop = 1; d.el.textContent = Math.round(d.val); d.x = x; d.z = z; d.el.classList.toggle('big', d.val >= 50); return; }
     }
     const el = document.createElement('div'); el.className = 'dn' + (crit ? ' crit' : ''); el.textContent = Math.round(dmg);
     $('dmg').appendChild(el);
     this.dnSide = -(this.dnSide || 1);
-    this.dns.push({ el, src, crit, val: dmg, last: now, pop: 1, x, y, z, t: 0, side: this.dnSide * (0.4 + Math.random() * 0.5) * (crit ? 1.4 : 1) });
+    this.dns.push({ el, src, crit: !!crit, val: dmg, last: now, pop: 1, x, y, z, t: 0, side: this.dnSide * (0.4 + Math.random() * 0.5) * (crit ? 1.4 : 1) });
     if (this.dns.length > 40) this.dns.shift().el.remove();
   }
   project(x, y, z) {

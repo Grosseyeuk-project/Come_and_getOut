@@ -151,10 +151,15 @@ export class Effects {
       this.wet.emit({ x, y, z, vx: (bx + (Math.random() - 0.5) * 1.1) * sp, vy: (Math.random() - 0.1) * 3.2, vz: (bz + (Math.random() - 0.5) * 1.1) * sp, life: 0.5 + Math.random() * 0.4, s0: 0.1 + Math.random() * 0.12, s1: 0.05, c0: B.drop, c1: B.dropEnd, grav: 13, floor: 0.04, drag: 0.6 });
     }
     // mist cloud
-    for (let i = 0; i < 3; i++) this.wet.emit({ x: x + bx * 0.15, y, z: z + bz * 0.15, vx: bx * (1.5 + Math.random() * 2) + (Math.random() - 0.5), vy: Math.random() * 0.8, vz: bz * (1.5 + Math.random() * 2) + (Math.random() - 0.5), life: 0.35 + Math.random() * 0.25, s0: 0.25, s1: 0.9 + P * 0.25, c0: B.mist, c1: B.mistEnd, drag: 4 });
-    // bright wet glint (additive) so hits read against dark bodies
-    this.add.emit({ x, y, z, life: 0.06, s0: 0.5, s1: 0.2, c0: B.glint, c1: [0, 0, 0, 0] });
-    for (let i = 0; i < Math.round(P); i++) {
+    for (let i = 0; i < 3; i++) this.wet.emit({ x: x + bx * 0.15, y, z: z + bz * 0.15, vx: bx * (1.5 + Math.random() * 2) + (Math.random() - 0.5), vy: Math.random() * 0.8, vz: bz * (1.5 + Math.random() * 2) + (Math.random() - 0.5), life: 0.35 + Math.random() * 0.25, s0: 0.35, s1: 1.2 + P * 0.35, c0: B.mist, c1: B.mistEnd, drag: 4 });
+    // bright wet glint + hot fragments (additive) so hits read against dark bodies at gameplay zoom
+    this.star.emit({ x, y, z, life: 0.06, s0: 0.7 + P * 0.2, s1: 0.25, c0: B.glint, c1: [0, 0, 0, 0] });
+    for (let i = 0; i < 3 + P * 2; i++) {
+      const sp = 4 + Math.random() * 7;
+      this.streaks.emit({ x, y, z, vx: (bx + (Math.random() - 0.5) * 1.6) * sp, vy: Math.random() * 3, vz: (bz + (Math.random() - 0.5) * 1.6) * sp, life: 0.12 + Math.random() * 0.15, trail: 0.025, w: 0.016, c0: B.spark, c1: [0.6, 0.05, 0.02, 0], grav: 10, drag: 2 });
+    }
+    if (P > 1.2 && Math.random() < 0.5) this.gibs.emit({ x, y, z, vx: bx * 4 + (Math.random() - 0.5) * 2, vy: 2 + Math.random() * 3, vz: bz * 4 + (Math.random() - 0.5) * 2, s: 0.04 + Math.random() * 0.04, life: 8, color: B.gib[(Math.random() * B.gib.length) | 0], spin: 25, bounce: 0.2 });
+    for (let i = 0; i < Math.max(1, Math.round(P * 1.5)); i++) {
       const d = 0.6 + Math.random() * 1.6 * P;
       this.splat(x + bx * d + (Math.random() - 0.5) * 0.5, z + bz * d + (Math.random() - 0.5) * 0.5, Math.atan2(bz, bx), 0.7 + Math.random() * 0.6 * P, B);
     }
@@ -187,7 +192,7 @@ export class Effects {
     m.scale.set(grow ? 0.001 : s, 1, grow ? 0.001 : s);
     this.scene.add(m); this.decals.push(m);
     if (grow) this.growing.push({ m, s, t: -delay, dur: grow });
-    if (this.decals.length > 220) { const o = this.decals.shift(); this.scene.remove(o); }
+    if (this.decals.length > 150) { const o = this.decals.shift(); this.scene.remove(o); }
   }
 
   // footstep / roll dust
@@ -285,7 +290,7 @@ function mergeTwo(a, b) { return mergeGeometries([a, b], false); }
 function flashTexture() { return T.softSprite('flash', 1, 0); }
 
 // gore palettes (linear colours; droplets are unlit sprites so keep them saturated enough to read)
-const BLOOD = { drop: [0.85, 0.05, 0.03, 1], dropEnd: [0.45, 0.02, 0.01, 0.9], mist: [0.6, 0.05, 0.04, 0.6], mistEnd: [0.25, 0.01, 0.01, 0], glint: [2.2, 0.3, 0.15, 1], gib: [0x7a1410, 0x5a0c0a, 0x8a2a20, 0x9a7a6a] };
-const ICHOR = { drop: [0.38, 0.45, 0.05, 1], dropEnd: [0.18, 0.22, 0.02, 0.9], mist: [0.3, 0.38, 0.06, 0.5], mistEnd: [0.15, 0.2, 0.02, 0], glint: [1.2, 1.6, 0.2, 1], gib: [0x4a5a14, 0x3a3a10, 0x6a7a2a, 0x8a8a6a] };
+const BLOOD = { drop: [0.85, 0.05, 0.03, 1], dropEnd: [0.45, 0.02, 0.01, 0.9], mist: [0.6, 0.05, 0.04, 0.6], mistEnd: [0.25, 0.01, 0.01, 0], glint: [2.4, 0.35, 0.15, 1], spark: [4, 0.9, 0.3, 1], gib: [0x7a1410, 0x5a0c0a, 0x8a2a20, 0x9a7a6a] };
+const ICHOR = { drop: [0.38, 0.45, 0.05, 1], dropEnd: [0.18, 0.22, 0.02, 0.9], mist: [0.3, 0.38, 0.06, 0.5], mistEnd: [0.15, 0.2, 0.02, 0], glint: [1.4, 1.9, 0.2, 1], spark: [2.4, 3, 0.5, 1], gib: [0x4a5a14, 0x3a3a10, 0x6a7a2a, 0x8a8a6a] };
 const CHIP = [0x6a6660, 0x5a5650, 0x7a746a, 0x4a4640, 0x807a70];
 const WOODC = [0x5a3a20, 0x6a4628, 0x4a2e18, 0x7a5432, 0x3a2414];

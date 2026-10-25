@@ -62,7 +62,7 @@ export class EnemyManager {
     else e.stagger = Math.max(e.stagger, 0.04);
     const hy = 1.15 * e.hum.K.scale;
     // brutes wear plate: half the hits spark off the armour
-    if (brute && Math.random() < 0.5) g.fx.impact(hx - dx * 0.25, hy, hz - dz * 0.25, -dx, -dz, 'metal', dx, dz, 0.6);
+    if ((brute && Math.random() < 0.5) || (e.type === 'raider' && Math.random() < 0.2)) g.fx.impact(hx - dx * 0.25, hy, hz - dz * 0.25, -dx, -dz, 'metal', dx, dz, 0.6);
     else g.fx.impact(hx - dx * 0.2, hy, hz - dz * 0.2, -dx, -dz, e.type === 'mutant' ? 'ichor' : 'flesh', dx, dz, power);
     g.hud.damageNumber(e.pos.x, 2.1 * e.hum.K.scale, e.pos.z, dmg, crit, e);
     g.audio.play('flesh', e.pos, { minGap: 0.05 });
