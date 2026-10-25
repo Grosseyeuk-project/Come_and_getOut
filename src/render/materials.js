@@ -112,7 +112,7 @@ function wet(mat, scale = 0.055, amount = 1) {
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
         float wetK = wetMask();
         roughnessFactor = mix(roughnessFactor, 0.06, wetK);
-        diffuseColor.rgb *= mix(1.0, 0.55, wetK);`)
+        diffuseColor.rgb *= mix(1.0, 0.72, wetK);`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         normal = normalize(mix(normal, normalize(vNormal), wetMask() * 0.85));`);
   };
@@ -166,6 +166,7 @@ export function materials() {
   M.plate = new THREE.MeshStandardMaterial({ color: 0xb8b090, roughness: 0.6 });
   M.rim = new THREE.MeshStandardMaterial({ color: 0x55575a, roughness: 0.4, metalness: 1 });
   M.interior = new THREE.MeshStandardMaterial({ color: 0x141210, roughness: 0.95 });
+  M.carDetail = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0.55, vertexColors: true, envMapIntensity: 1.5 });
   M.metal = std(T.rustMetal('dark', [0.18, 0.18, 0.19]), { metal: true });
   M.rust = std(T.rustMetal('rusty', [0.3, 0.14, 0.07]), { metal: true });
   M.wood = std(T.wood(), {});
@@ -242,7 +243,7 @@ export class GeoBatch {
   constructor() { this.groups = new Map(); }
   add(mat, geo) {
     if (!geo.boundingBox) geo.computeBoundingBox();
-    const bb = geo.boundingBox, CH = 28;
+    const bb = geo.boundingBox, CH = 44;
     const key = mat.uuid + ':' + Math.floor((bb.min.x + bb.max.x) / 2 / CH) + ',' + Math.floor((bb.min.z + bb.max.z) / 2 / CH);
     if (!this.groups.has(key)) this.groups.set(key, { mat, list: [] });
     const g = geo.index ? geo.toNonIndexed() : geo;

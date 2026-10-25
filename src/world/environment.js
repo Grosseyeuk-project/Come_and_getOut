@@ -70,6 +70,7 @@ export class Environment {
     this.signs = []; // emissive signage {pos, color, flicker, seed, dead}: lighting can pair lights with these
     this.anchors = []; // facade cable anchors
     this.winLights = 0;
+    this.neon = (layout.themeDef && layout.themeDef.neon) || 1;
     this.emissiveMeshes = []; // filled after batching: meshes whose material is emissive (neon, bulbs, windows)
 
     this.buildGround();
@@ -177,7 +178,8 @@ export class Environment {
     const w = b.x1 - b.x0, d = b.z1 - b.z0;
     const corners = [[b.x0, b.z0], [b.x1, b.z0], [b.x1, b.z1], [b.x0, b.z1]];
     const winP = b.style === 'concrete' ? 0.78 : 0.62;
-    const shop = rng.chance(0.5);
+    const TH = this.L.themeDef || { neon: 1, shop: 0.5 };
+    const shop = rng.chance(TH.shop);
     const shopColor = rng.pick([0x7a2a20, 0x2a4a6a, 0x3a5a3a, 0x8a6a2a, 0x5a3a5a, 0x2a5a5a]);
     const seedOff = (b.seed % 997) * 1.37;
     const prof = (s) => {
@@ -421,7 +423,7 @@ export class Environment {
           else if (b.style !== 'brick' && rng.chance(0.09) && bw > 2) this.onWall(S, K.balconyParts(bw - 0.2, rng), tm, win.f * FH + 0.05, 0);
         }
         // vertical blade sign at a street corner (1st-2nd floor), flickering neon
-        if (!bladeDone && street && (k === 0 || k === S.bays.length - 1) && bay.top > FH * 2 && rng.chance(0.6)) {
+        if (!bladeDone && street && (k === 0 || k === S.bays.length - 1) && bay.top > FH * 2 && rng.chance(Math.min(0.95, 0.55 * this.neon))) {
           bladeDone = true;
           const t = k === 0 ? bay.t0 + 0.6 : bay.t1 - 0.6;
           this.addSign(S, t, FH * 1.5 + rng.range(-0.3, 0.8), rng.range(2.2, 3.2), rng, true, signCell);
@@ -477,7 +479,7 @@ export class Environment {
       else if (rng.chance(0.55)) this.place(K.roofVentParts(rng), x, H, z, rng.range(0, 6));
       else this.place(K.acUnitParts(), x, H + 0.3, z, rng.range(0, 6));
     }
-    if (rng.chance(0.3)) this.addSignRoof(b, H, rng, cx, cz);
+    if (rng.chance(0.3 * this.neon)) this.addSignRoof(b, H, rng, cx, cz);
   }
   addSignRoof(b, H, rng, cx, cz) { // billboard on the roof facing the street (camera side)
     const M = this.M, w = Math.min(6, (b.x1 - b.x0) * 0.7), h = w * 0.5, cell = rng.int(0, SIGN_WORDS.length - 1), seed = rng.range(0.5, 1), dead = rng.chance(0.35);
@@ -571,6 +573,38 @@ export class Environment {
       case 'cart': this.place(K.cartParts(), p.x, 0, p.z, rot, 1, 0, rng.chance(0.4) ? Math.PI / 2 - 0.1 : 0); break;
       case 'mattress': this.place(K.mattressParts(rng), p.x, this.heightAt(p.x, p.z), p.z, rot); break;
       case 'tarp': this.place(K.tarpParts(rng), p.x, 0, p.z, rot); break;
+      case 'debrisField': {
+        const s2 = p.s || 3;
+        for (let i = 0; i < 26 * s2; i++) { const a = rng.range(0, 6.28), r = Math.sqrt(rng.next()) * s2; const x = p.x + Math.cos(a) * r, z = p.z + Math.sin(a) * r * rng.range(0.6, 1); const k = rng.next();
+          if (k < 0.35) this.rubble.add(x, 0.02, z, rng.range(0.05, 0.22), rng.range(0, 3), rng.range(0, 3), 0);
+          else if (k < 0.55) this.bricks.add(x, 0.04, z, 1, rng.range(-0.3, 0.3), rng.range(0, 6), rng.range(-0.3, 0.3));
+          else if (k < 0.85) this.litter.add(x, 0.015, z, rng.range(0.7, 1.4), rng.range(-0.1, 0.1), rng.range(0, 6.3), 0, rng.pick([0xd8d0bc, 0xb8b0a0, 0x9a9488]));
+          else if (k < 0.95) this.debris.add(x, 0.03, z, 1, rng.range(-0.1, 0.1), rng.range(0, 6), rng.range(-0.1, 0.1));
+          else this.cans.add(x, 0.04, z, 1, 0, rng.range(0, 6.3), 0, rng.pick([0x8a2a20, 0x6a7a80, 0x2a5a2a]));
+        }
+        this.decals.push({ kind: rng.chance(0.5) ? 'stain' : 'dirt', x: p.x, z: p.z, s: s2 * 2, rot: rng.range(0, 6) });
+        if (rng.chance(0.5)) { const g = rockGeo(rng.int(1, 999), 1); const k = rng.range(0.6, 1.1); g.scale(k, k * 0.4, k); g.translate(p.x, -0.05, p.z); boxUV(g, 0.4); this.batch.add(M.rubble, g); }
+        break;
+      }
+      case 'crater': {
+        const s2 = p.s || 2;
+        this.decals.push({ kind: 'scorch', x: p.x, z: p.z, s: s2 * 2.6, rot: rng.range(0, 6) });
+        this.decals.push({ kind: 'patch', x: p.x, z: p.z, s: s2 * 1.1, rot: rng.range(0, 6) });
+        for (let i = 0; i < 16; i++) { const a = (i / 16) * 6.28 + rng.range(-0.2, 0.2), r = s2 * rng.range(0.75, 1.05); this.rubble.add(p.x + Math.cos(a) * r, 0.02, p.z + Math.sin(a) * r, rng.range(0.18, 0.42), rng.range(0, 3), rng.range(0, 3), 0, 0x5a5650); }
+        for (let i = 0; i < 10; i++) { const a = rng.range(0, 6.28), r = s2 * rng.range(1.1, 2.2); this.rubble.add(p.x + Math.cos(a) * r, 0.02, p.z + Math.sin(a) * r, rng.range(0.06, 0.16), rng.range(0, 3), rng.range(0, 3), 0, 0x4a4640); }
+        break;
+      }
+      case 'hedgehog': {
+        const parts = []; for (let i = 0; i < 3; i++) parts.push({ mat: M.rust, geo: K.box(1.8, 0.12, 0.12, 0, 0.55, 0, i === 0 ? 0.6 : i === 1 ? -0.6 : 0, i * 1.05, i === 2 ? 0.95 : 0) });
+        this.place(parts, p.x, 0, p.z, rot); col.add(p.x, p.z, 0.7, 0.7, rot, 1.0, { kind: 'cover', blocksShots: false }); break;
+      }
+      case 'treepit': {
+        const y = this.heightAt(p.x, p.z);
+        this.addBox(M.trim, p.x, y + 0.04, p.z, 1.3, 0.1, 1.3, 0, 0x8a8680, 0.5);
+        this.place(P.deadTreeParts(rng, p.s || 1, !p.dead), p.x, y, p.z, rng.range(0, 6));
+        if (rng.chance(0.6)) this.place(P.bushParts(rng, 0.6), p.x, y, p.z, 0);
+        col.add(p.x, p.z, 0.2, 0.2, 0, 4, { kind: 'tree' }); break;
+      }
       case 'jersey': this.place(P.jerseyParts(p.len || 2.6), p.x, 0, p.z, rot); col.add(p.x, p.z, (p.len || 2.6) / 2, 0.32, rot, 0.85, { kind: 'cover' }); break;
       case 'sandbags': this.place(P.sandbagParts(p.len || 3, rng), p.x, 0, p.z, rot); col.add(p.x, p.z, (p.len || 3) / 2, 0.3, rot, 0.8, { kind: 'cover' }); break;
       case 'planks': this.place(P.plankParts(p.len || 2.6, rng), p.x, 0, p.z, rot); col.add(p.x, p.z, (p.len || 2.6) / 2, 0.15, rot, 1.5, { kind: 'cover' }); break;
@@ -823,7 +857,7 @@ export class Environment {
           if (rng.chance(0.3)) this.place(K.waterTankParts(rng), x, H, z, rng.range(0, 3)); else this.place(K.roofVentParts(rng), x, H, z, rng.range(0, 6));
         }
         // billboard / blade neon facing the playable square
-        if (!o.near && rng.chance(0.55)) {
+        if (!o.near && rng.chance(Math.min(0.9, 0.5 * this.neon))) {
           const cell = rng.int(0, SIGN_WORDS.length - 1), seed = rng.next() < 0.4 ? rng.range(0.5, 0.74) : rng.range(0.76, 1);
           // which face looks at the centre: pick the dominant axis toward origin
           const toC = Math.abs(cx) > Math.abs(cz) ? [Math.sign(-cx), 0] : [0, Math.sign(-cz)];

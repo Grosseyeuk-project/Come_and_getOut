@@ -1,7 +1,7 @@
 // Procedural prop models. Each builder returns an array of { mat, geo } parts in local space
 // (origin on the ground at the prop centre, +X = forward/length). environment.js merges them.
 import * as THREE from 'three';
-import { materials, boxUV } from '../render/materials.js';
+import { materials, boxUV, colorize } from '../render/materials.js';
 import { RNG } from '../core/rng.js';
 
 const V = THREE.Vector3;
@@ -124,6 +124,12 @@ export function carParts(variant, paint, burnt) {
   if (variant <= 3) {
     const mx = variant === 0 ? 0.95 : variant === 3 ? 0.85 : variant === 1 ? 1.6 : 1.2, my = variant === 1 ? 1.25 : variant === 2 ? 1.15 : 1.0;
     for (const sz of [-1, 1]) add(burnt ? M.black : body, box(0.14, 0.12, 0.16, mx, my, sz * (W / 2 + 0.05)));
+  }
+  const DET = new Map([[M.headlight, 0x8a8880], [M.taillight, 0x5a0806], [M.plate, 0xb0a888], [M.rim, 0x5a5c60], [M.chrome, 0x7a7a7a], [M.black, 0x0c0c0d], [M.interior, 0x161412]]);
+  for (const p of parts) { // metric box-projected UVs so paint/rust/char detail keeps a constant texel scale
+    if (p.geo.index) p.geo = p.geo.toNonIndexed();
+    if (DET.has(p.mat)) { colorize(p.geo, DET.get(p.mat)); p.mat = M.carDetail; } // one draw call for all small trim
+    boxUV(p.geo, 0.55, [variant * 0.31 + paint * 0.17, paint * 0.23]);
   }
   carCache.set(key, parts.map((p) => ({ mat: p.mat, geo: p.geo })));
   return parts.map((p) => ({ mat: p.mat, geo: p.geo.clone() }));

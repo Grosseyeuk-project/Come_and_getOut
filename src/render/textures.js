@@ -382,8 +382,8 @@ export function decal(kind) {
       const n = fbm(x / 40, y / 40, 4, hashKind(kind));
       const a = clamp((1 - r) * 2 + (n - 0.5) * 2.2 - 0.3, 0, 1);
       const i = (y * S + x) * 4;
-      if (kind === 'oil') { id.data[i] = 8; id.data[i + 1] = 8; id.data[i + 2] = 10; id.data[i + 3] = a * 200; }
-      else if (kind === 'scorch') { id.data[i] = 5; id.data[i + 1] = 4; id.data[i + 2] = 3; id.data[i + 3] = clamp(a * 1.2, 0, 1) * 235; }
+      if (kind === 'oil') { id.data[i] = 10; id.data[i + 1] = 9; id.data[i + 2] = 12; id.data[i + 3] = a * 150; }
+      else if (kind === 'scorch') { id.data[i] = 9; id.data[i + 1] = 7; id.data[i + 2] = 6; id.data[i + 3] = clamp(a * 1.1, 0, 1) * 205; }
       else if (kind === 'dirt') { const f = fbm(x / 9, y / 9, 3, 77); id.data[i] = 62 + f * 30; id.data[i + 1] = 54 + f * 26; id.data[i + 2] = 42 + f * 20; id.data[i + 3] = clamp(a * 1.3 * (0.5 + f), 0, 1) * 210; }
       else if (kind === 'blood') { id.data[i] = 70; id.data[i + 1] = 4; id.data[i + 2] = 4; id.data[i + 3] = clamp(a * 1.6, 0, 1) * 230; }
       else { id.data[i] = 20; id.data[i + 1] = 24; id.data[i + 2] = 28; id.data[i + 3] = clamp(a * 2, 0, 1) * 255; }
@@ -426,7 +426,7 @@ export function decal(kind) {
       const dx = Math.abs(x / S - 0.5) * 2, dy = Math.abs(y / S - 0.5) * 2, i = (y * S + x) * 4, n = fbm(x / 30, y / 30, 4, hashKind(kind));
       let a;
       if (kind === 'patch') { const e = Math.max(dx, dy) + (n - 0.5) * 0.12; a = e < 0.9 ? 0.92 : 0; const v = 16 + n * 16 + (hash2(x, y, 3) > 0.9 ? 10 : 0); id.data[i] = v; id.data[i + 1] = v; id.data[i + 2] = v + 2; if (Math.abs(e - 0.88) < 0.025) { id.data[i] = id.data[i + 1] = id.data[i + 2] = 8; a = 1; } }
-      else { const r = Math.hypot(dx, dy); a = clamp((1 - r) * 1.6 + (n - 0.5) * 2.4 - 0.2, 0, 1) * (kind === 'wet' ? 0.55 : 0.6); const v = kind === 'wet' ? 10 : 14 + n * 8; id.data[i] = v; id.data[i + 1] = v * 0.95; id.data[i + 2] = v * 0.9; }
+      else { const r = Math.hypot(dx, dy); a = clamp((1 - r) * 1.6 + (n - 0.5) * 2.4 - 0.2, 0, 1) * (kind === 'wet' ? 0.3 : 0.5); const v = kind === 'wet' ? 22 : 14 + n * 8; id.data[i] = v; id.data[i + 1] = v * 0.95; id.data[i + 2] = v * 0.9; }
       id.data[i + 3] = a * 255;
     }
     g.putImageData(id, 0, 0);
@@ -542,14 +542,13 @@ export function burntMetal() {
   if (cache.burnt) return cache.burnt;
   const S = 256;
   cache.burnt = genPBR(S, (u, v, x, y, o) => {
-    const n = tn(u, v, 3, 5, 211), r = tn(u, v, 10, 4, 212), f = hash2(x, y, 213), ash = tn(u, v, 6, 3, 214);
-    const rust = clamp((n - 0.42) * 3, 0, 1);
-    let cr = 0.035 + f * 0.02, cg = 0.032 + f * 0.018, cb = 0.03 + f * 0.016;
-    const rr = 0.22 * (0.6 + r * 0.6), rg = 0.085 * (0.6 + r * 0.6), rb = 0.035;
-    cr = cr * (1 - rust) + rr * rust; cg = cg * (1 - rust) + rg * rust; cb = cb * (1 - rust) + rb * rust;
-    const a = clamp((ash - 0.62) * 4, 0, 1) * 0.6;
-    o.r = cr * (1 - a) + 0.32 * a; o.g = cg * (1 - a) + 0.31 * a; o.b = cb * (1 - a) + 0.29 * a;
-    o.h = 0.5 + r * 0.4 * rust + f * 0.1; o.ro = 0.75 + rust * 0.2; o.m = 0.3 * (1 - rust);
+    const n = tn(u, v, 3, 4, 211), fine = tn(u, v, 20, 3, 212), f = hash2(x, y, 213), ash = tn(u, v, 9, 3, 214);
+    const rust = clamp(0.5 + (n - 0.5) * 0.9 + (fine - 0.5) * 0.7, 0, 1);
+    const cr = 0.035 + f * 0.015, rr = 0.15 + fine * 0.06, rg = 0.065 + fine * 0.025;
+    let r = cr + (rr - cr) * rust, g = cr * 0.95 + (rg - cr * 0.95) * rust, b = cr * 0.9 + (0.03 - cr * 0.9) * rust;
+    const a = clamp((ash - 0.68) * 3, 0, 1) * 0.5;
+    o.r = r * (1 - a) + 0.26 * a; o.g = g * (1 - a) + 0.25 * a; o.b = b * (1 - a) + 0.24 * a;
+    o.h = 0.5 + fine * 0.35 + f * 0.15; o.ro = 0.72 + rust * 0.2 + f * 0.06; o.m = 0.25 * (1 - rust);
   }, 3.0, { metal: true });
   return cache.burnt;
 }
