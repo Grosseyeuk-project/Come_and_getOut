@@ -459,7 +459,7 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
   updateDeath(dt) {
     this.deathT += dt;
     const T0 = this.deathT, mode = this.deathMode;
-    this.uDissolve.value = T0 > 5.2 ? Math.min(1.05, (T0 - 5.2) / 2.6) : 0;
+    this.uDissolve.value = T0 > 5.2 && this.kind !== 'player' ? Math.min(1.05, (T0 - 5.2) / 2.6) : 0;
     this.dissolve = this.uDissolve.value;
     if (mode === 'gib') return;
     // yaw toward the fall direction (fast), plus spin variant
