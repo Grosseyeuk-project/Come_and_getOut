@@ -24,6 +24,9 @@ export class Effects {
       blood: new THREE.MeshStandardMaterial({ map: T.decal('blood'), transparent: true, depthWrite: false, roughness: 0.3, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }),
       scorch: new THREE.MeshStandardMaterial({ map: T.decal('scorch'), transparent: true, depthWrite: false, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }),
     };
+    this.flashes = [];
+    const fg = new THREE.PlaneGeometry(1, 0.5); fg.rotateX(-Math.PI / 2); fg.translate(0.5 - 40 / 256, 0, 0); this.flashGeo = fg;
+    this.flashMat = new THREE.MeshBasicMaterial({ map: T.muzzleTex(), color: new THREE.Color(2.2, 1.7, 1.2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
     this.time = 0;
     this.dustT = 0; this.mistT = 0; this.emberT = 0;
     this.mistColor = [0.5, 0.5, 0.52]; this.ambientEmbers = 0.5; this.ash = 0;
@@ -46,6 +49,10 @@ export class Effects {
   }
 
   muzzle(x, y, z, dx, dz, scale = 1, color = [1, 0.75, 0.4]) {
+    const fm = new THREE.Mesh(this.flashGeo, this.flashMat);
+    fm.position.set(x, y, z); fm.rotation.y = Math.atan2(-dz, dx); fm.rotation.x = (Math.random() - 0.5) * 0.6;
+    const fs = (0.9 + Math.random() * 0.5) * scale; fm.scale.set(fs, 1, fs * (0.8 + Math.random() * 0.5)); fm.renderOrder = 8;
+    this.scene.add(fm); this.flashes.push({ m: fm, t: 0 });
     for (let i = 0; i < 3; i++) this.add.emit({ x: x + dx * 0.1 * i, y, z: z + dz * 0.1 * i, vx: dx * (3 + i * 3), vz: dz * (3 + i * 3), life: 0.06, s0: (0.55 - i * 0.12) * scale, s1: 0.1, c0: [color[0] * 4, color[1] * 4, color[2] * 4, 1], c1: [color[0], color[1] * 0.5, 0.1, 0] });
     for (let i = 0; i < 4; i++) this.add.emit({ x, y, z, vx: dx * 6 + (Math.random() - 0.5) * 5, vy: Math.random() * 2, vz: dz * 6 + (Math.random() - 0.5) * 5, life: 0.12, s0: 0.06, s1: 0.02, c0: [3, 2, 0.8, 1], c1: [1, 0.3, 0, 0] });
     this.smoke.emit({ x: x + dx * 0.2, y, z: z + dz * 0.2, vx: dx * 1.2, vy: 0.6, vz: dz * 1.2, life: 0.8, s0: 0.25 * scale, s1: 1.0 * scale, c0: [0.6, 0.58, 0.55, 0.25], c1: [0.5, 0.5, 0.5, 0], drag: 2 });
@@ -114,6 +121,7 @@ export class Effects {
       if (t.d - t.seg > t.len) { this.scene.remove(t.m); t.m.material.dispose(); this.tracers.splice(i, 1); }
       else t.m.material.color.multiplyScalar(1);
     }
+    for (let i = this.flashes.length - 1; i >= 0; i--) { const f = this.flashes[i]; f.t += dt; if (f.t > 0.045) { this.scene.remove(f.m); this.flashes.splice(i, 1); } }
     // transient lights
     for (let i = this.lights.length - 1; i >= 0; i--) {
       const l = this.lights[i]; l.t += dt; l.s.intensity = l.i0 * Math.max(0, 1 - l.t / l.ttl);

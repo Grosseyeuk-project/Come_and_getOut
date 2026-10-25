@@ -160,9 +160,9 @@ export function plaster() {
   cache.plaster = genPBR(S, (u, v, x, y, o) => {
     const n = tn(u, v, 4, 5, 51), peel = tn(u, v, 6, 4, 52), f = hash2(x, y, 53);
     const streak = vnoise(u * 50, v * 1.5, 54, 50) * (0.6 + 0.4 * tn(u, v, 2, 2, 55));
-    const exposed = peel > 0.6;
-    if (exposed) { // brick/concrete under peeled paint
-      const b = 0.3 + n * 0.1; o.r = b * 1.1; o.g = b * 0.85; o.b = b * 0.7; o.h = 0.3; o.ro = 0.95;
+    const exposed = peel > 0.66;
+    if (exposed) { // concrete under peeled paint
+      const b = 0.4 + n * 0.1; o.r = b * 1.02; o.g = b * 0.95; o.b = b * 0.88; o.h = 0.3; o.ro = 0.95;
     } else {
       const b = 0.68 + n * 0.14 - streak * 0.25 + (f - 0.5) * 0.03; o.r = b; o.g = b; o.b = b; o.h = 0.6 + n * 0.1 + f * 0.03; o.ro = 0.82;
     }
@@ -454,4 +454,17 @@ export function graffitiAtlas() {
   }
   cache.graffiti = toTex(c, true, false);
   return cache.graffiti;
+}
+
+// Muzzle flash: hot core + forward-biased spikes (drawn pointing +x)
+export function muzzleTex() {
+  if (cache.muzzle) return cache.muzzle;
+  const c = canvas(256, 128), g = c.getContext('2d');
+  g.globalCompositeOperation = 'lighter';
+  const core = g.createRadialGradient(40, 64, 0, 40, 64, 40); core.addColorStop(0, 'rgba(255,250,230,1)'); core.addColorStop(0.4, 'rgba(255,190,90,0.8)'); core.addColorStop(1, 'rgba(255,120,30,0)');
+  g.fillStyle = core; g.fillRect(0, 0, 256, 128);
+  const spike = (ang, len, w) => { g.save(); g.translate(40, 64); g.rotate(ang); const gr = g.createLinearGradient(0, 0, len, 0); gr.addColorStop(0, 'rgba(255,230,170,0.95)'); gr.addColorStop(1, 'rgba(255,120,20,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(0, -w); g.lineTo(len, 0); g.lineTo(0, w); g.fill(); g.restore(); };
+  spike(0, 210, 14); spike(0.5, 70, 8); spike(-0.5, 70, 8); spike(1.4, 40, 6); spike(-1.4, 40, 6); spike(Math.PI, 30, 6);
+  cache.muzzle = toTex(c, true, false);
+  return cache.muzzle;
 }

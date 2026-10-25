@@ -273,6 +273,14 @@ export class Environment {
       col.add(cx, cz, 1.6, 1.4, ry, 1.6, { kind: 'cover' });
       for (let i = 0; i < 8; i++) this.rubble.add(cx + rng.range(-2.5, 2.5), 0.05, cz + rng.range(-2.5, 2.5), rng.range(0.15, 0.5), rng.range(0, 3), rng.range(0, 3), 0);
     }
+    // occasional fire burning inside the ruin (light pool + smoke through the roof)
+    if (!b.edge && rng.chance(b.collapsed ? 0.15 : 0.22)) {
+      const fx = rng.range(b.x0 + 1.5, b.x1 - 1.5), fz = rng.range(b.z0 + 1.5, b.z1 - 1.5);
+      for (let i = 0; i < 5; i++) this.debris.add(fx + rng.range(-0.5, 0.5), 0.15, fz + rng.range(-0.5, 0.5), 1, rng.range(-0.4, 0.4), rng.range(0, 6), rng.range(-0.3, 0.3), 0x1a1410);
+      this.decals.push({ kind: 'scorch', x: fx, z: fz, s: 3, rot: rng.range(0, 6) });
+      this.addFire(fx, 0.15, fz, rng.range(0.7, 1.0));
+      this.col.add(fx, fz, 0.4, 0.4, 0, 0.5, { kind: 'fire', blocksShots: false });
+    }
     // interior partition with door gap
     if (!b.collapsed && (w > 11 || d > 11) && rng.chance(0.7)) {
       const ph = Math.min(FH, H);

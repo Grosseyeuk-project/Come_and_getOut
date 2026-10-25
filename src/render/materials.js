@@ -28,8 +28,10 @@ export function applyCutout(mat) {
           if (along < lenP - 0.8 && vCutW.y > 0.25) {
             float d = length(toF - dP * along);
             float fade = smoothstep(0.0, 2.5, lenP - along);
-            float r = uCutR * fade;
-            float bayer = fract(dot(floor(gl_FragCoord.xy), vec2(0.5, 0.25)) + fract(floor(gl_FragCoord.y) * 0.5) * 0.5);
+            float r = uCutR * fade * clamp(along / lenP, 0.0, 1.0); // constant screen-space radius
+            ivec2 bp = ivec2(mod(floor(gl_FragCoord.xy), 4.0));
+            const float BM[16] = float[16](0., 8., 2., 10., 12., 4., 14., 6., 3., 11., 1., 9., 15., 7., 13., 5.);
+            float bayer = (BM[bp.x + bp.y * 4] + 0.5) / 16.0;
             float k = 1.0 - smoothstep(r * 0.55, r, d);
             if (k > bayer * 0.9 + 0.05) discard;
           }
