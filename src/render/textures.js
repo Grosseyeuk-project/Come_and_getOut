@@ -192,10 +192,10 @@ export function pavers() {
   const S = 512, rng = new RNG(71);
   const cracks = crackMask(S, rng, 8, 1, 30);
   cache.pavers = genPBR(S, (u, v, x, y, o) => {
-    const i = y * S + x, g = 4;
+    const i = y * S + x, g = 2;
     const gx = u * g, gy = v * g, fx = gx % 1, fy = gy % 1;
     const tid = hash2(Math.floor(gx), Math.floor(gy), 72);
-    const joint = fx < 0.018 || fy < 0.018;
+    const joint = fx < 0.01 || fy < 0.01;
     const n = tn(u, v, 8, 4, 73), f = hash2(x, y, 74);
     const missing = tid > 0.93;
     let b = joint ? 0.11 : 0.17 + tid * 0.06 + n * 0.08 + (f - 0.5) * 0.04;
@@ -375,7 +375,7 @@ export function decal(kind) {
   const k = 'decal_' + kind;
   if (cache[k]) return cache[k];
   const S = 256, c = canvas(S), g = c.getContext('2d'), rng = new RNG(hashKind(kind));
-  if (kind === 'oil' || kind === 'scorch' || kind === 'puddle' || kind === 'blood') {
+  if (kind === 'oil' || kind === 'scorch' || kind === 'puddle' || kind === 'blood' || kind === 'dirt') {
     const id = g.createImageData(S, S);
     for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
       const dx = x / S - 0.5, dy = y / S - 0.5, r = Math.hypot(dx, dy) * 2;
@@ -384,6 +384,7 @@ export function decal(kind) {
       const i = (y * S + x) * 4;
       if (kind === 'oil') { id.data[i] = 8; id.data[i + 1] = 8; id.data[i + 2] = 10; id.data[i + 3] = a * 200; }
       else if (kind === 'scorch') { id.data[i] = 5; id.data[i + 1] = 4; id.data[i + 2] = 3; id.data[i + 3] = clamp(a * 1.2, 0, 1) * 235; }
+      else if (kind === 'dirt') { const f = fbm(x / 9, y / 9, 3, 77); id.data[i] = 62 + f * 30; id.data[i + 1] = 54 + f * 26; id.data[i + 2] = 42 + f * 20; id.data[i + 3] = clamp(a * 1.3 * (0.5 + f), 0, 1) * 210; }
       else if (kind === 'blood') { id.data[i] = 70; id.data[i + 1] = 4; id.data[i + 2] = 4; id.data[i + 3] = clamp(a * 1.6, 0, 1) * 230; }
       else { id.data[i] = 20; id.data[i + 1] = 24; id.data[i + 2] = 28; id.data[i + 3] = clamp(a * 2, 0, 1) * 255; }
     }

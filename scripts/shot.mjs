@@ -55,6 +55,11 @@ const frames = (n) => g((n) => window.__game.renderFrames(n), n);
 for (const sc of scenarios) {
   try {
     if (sc === 'title') { await frames(2); await shot('title'); continue; }
+    if (sc === 'ui') { // real DOM click path: title -> Deploy -> playing
+      if ((await g(() => window.__game.state().mode)) === 'title') { await page.fill('#seedin', String(seed)); await page.click('#deploy'); }
+      await page.waitForFunction(() => window.__game.state().mode === 'playing', null, { timeout: 60000 });
+      await frames(2); await shot('ui_deploy'); continue;
+    }
     await g(() => { if (window.__game.state().mode !== 'playing') window.__game.start(); });
     if (sc === 'spawn') { await g(() => window.__game.advance(1.0)); await frames(3); await shot('spawn'); }
     else if (sc === 'move') {

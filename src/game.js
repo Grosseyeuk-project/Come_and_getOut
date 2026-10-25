@@ -119,6 +119,13 @@ export class Game {
     try { history.replaceState(null, '', `?seed=${this.seed}${location.search.includes('q=') ? '&q=' + new URLSearchParams(location.search).get('q') : ''}`); } catch (e) { /* file:// */ }
     this.hud.toast(`District #${this.seed} — find the extraction`, '#ffb347');
   }
+  // UI path: show the loading overlay for a frame before the blocking world build
+  startRunAsync(seed) {
+    const needBuild = seed !== this.seed || !this.worldFresh;
+    const ov = document.getElementById('loading');
+    if (needBuild && ov) { ov.style.display = 'flex'; requestAnimationFrame(() => setTimeout(() => { this.startRun(seed); ov.style.display = 'none'; }, 0)); }
+    else this.startRun(seed);
+  }
   showTitle() { this.mode = 'title'; this.hud.setScreen('title'); }
   setPaused(p) { if (this.mode !== 'playing' && this.mode !== 'paused') return; this.mode = p ? 'paused' : 'playing'; this.hud.setScreen(this.mode); }
 
@@ -217,7 +224,7 @@ export class Game {
 
   loop(now) {
     requestAnimationFrame(this.loop);
-    const rdt = Math.min(0.1, (now - this.last) / 1000); this.last = now;
+    const rdt = Math.max(0, Math.min(0.1, (now - this.last) / 1000)); this.last = Math.max(this.last, now); // rAF time can precede performance.now() at boot
     this.fps = this.fps * 0.95 + (1 / Math.max(1e-3, rdt)) * 0.05;
     if (this.manual) return; // debug: frames driven by __game
     const dt = Math.min(rdt, 1 / 20);

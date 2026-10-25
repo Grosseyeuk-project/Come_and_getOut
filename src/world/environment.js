@@ -68,6 +68,7 @@ export class Environment {
     for (const p of layout.props) this.buildProp(p);
     for (const line of layout.poles) this.buildPoles(line);
     const main = this.batch; this.batch = new GeoBatch();
+    this.scatterGround();
     this.buildSkyline(); // far silhouettes: no shadow casting (they would darken the whole map edge)
     this.batch.build(this.root, { cast: false, receive: false });
     this.batch = main;
@@ -140,7 +141,7 @@ export class Environment {
       for (const [u, v] of segs) {
         if (v - u < 0.2) continue;
         const [x0, x1, z0, z1] = alongZ ? [s.x0, s.x1, u, v] : [u, v, s.z0, s.z1];
-        this.addBox(M.pavers, (x0 + x1) / 2, 0.075, (z0 + z1) / 2, x1 - x0, 0.15, z1 - z0, 0, 0xffffff, 1 / 2.2);
+        this.addBox(M.pavers, (x0 + x1) / 2, 0.075, (z0 + z1) / 2, x1 - x0, 0.15, z1 - z0, 0, 0xffffff, 1 / 3.2);
         this.setH(x0, z0, x1, z1, 0.15);
       }
     }
@@ -431,6 +432,23 @@ export class Environment {
     this.lighting.addSource(new THREE.Vector3(x, y + 0.9, z), 0xff7a2a, 40 * s, 11 * Math.sqrt(s), 'fire', { priority: 1.3 });
   }
 
+  // fine clutter: pebbles/chunks everywhere walkable, dirt drifts along curbs
+  scatterGround() {
+    const rng = new RNG(this.L.seed ^ 0x9e11), L = this.L;
+    for (let i = 0; i < 2600; i++) {
+      const x = rng.range(-HALF, HALF), z = rng.range(-HALF, HALF);
+      if (this.col.blockedCircle(x, z, 0.2, 0.2)) continue;
+      const big = rng.chance(0.15);
+      this.rubble.add(x, this.heightAt(x, z) + 0.01, z, big ? rng.range(0.12, 0.25) : rng.range(0.04, 0.1), rng.range(0, 3), rng.range(0, 3), rng.range(0, 3));
+    }
+    for (let i = 0; i < 500; i++) { const x = rng.range(-HALF, HALF), z = rng.range(-HALF, HALF); if (!this.col.blockedCircle(x, z, 0.2, 0.2)) this.bricks.add(x, this.heightAt(x, z) + 0.035, z, 1, 0, rng.range(0, 6), 0); }
+    for (const r of L.roads) for (let a = -HALF; a < HALF; a += rng.range(3, 7)) {
+      const side = rng.sign(), lat = side * (r.w / 2 - rng.range(0.3, 0.9));
+      const [x, z] = r.axis === 'z' ? [r.x + lat, a] : [a, r.z + lat];
+      L.decals.push({ kind: 'dirt', x, z, s: 1, sx: r.axis === 'z' ? rng.range(1.2, 2.4) : rng.range(3, 6), sz: r.axis === 'z' ? rng.range(3, 6) : rng.range(1.2, 2.4), rot: 0 });
+    }
+  }
+
   buildPoles(line) {
     const M = this.M;
     const tops = [];
@@ -483,7 +501,7 @@ export class Environment {
       if (d.kind === 'dirtlot') continue;
       if (d.kind === 'dash') { add('dash', d.x, d.z, 0.5, 2.4, d.rot); continue; }
       if (d.kind === 'crosswalk') { add('crosswalk', d.x, d.z, d.s, 3.2, d.rot); continue; }
-      add(d.kind, d.x, d.z, d.s, d.s, d.rot, d.kind === 'puddle' ? 0.045 : 0.03 + ((d.x * 13.7 + d.z * 7.1) % 1 + 1) % 1 * 0.01);
+      add(d.kind, d.x, d.z, d.sx || d.s, d.sz || d.s, d.rot, d.kind === 'puddle' ? 0.045 : d.kind === 'dirt' ? 0.028 : 0.03 + ((d.x * 13.7 + d.z * 7.1) % 1 + 1) % 1 * 0.01);
     }
     // blood / scorch get dynamic additions via fx; here static only
     const geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);

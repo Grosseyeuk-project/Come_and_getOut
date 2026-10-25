@@ -59,11 +59,11 @@ export class HUD {
     const g = this.game;
     $('seedin').value = g.seed;
     $('rnd').onclick = () => { $('seedin').value = Math.floor(Math.random() * 1e6); g.audio.unlock(); g.audio.play('ui'); };
-    $('deploy').onclick = () => { g.audio.unlock(); g.audio.play('ui'); const v = parseInt($('seedin').value, 10); g.startRun(isNaN(v) ? g.seed : v); };
-    $('retry').onclick = () => { g.audio.play('ui'); g.startRun(g.seed); };
-    $('newrun').onclick = () => { g.audio.play('ui'); g.startRun(Math.floor(Math.random() * 1e6)); };
-    $('next').onclick = () => { g.audio.play('ui'); g.startRun(Math.floor(Math.random() * 1e6)); };
-    $('replay').onclick = () => { g.audio.play('ui'); g.startRun(g.seed); };
+    $('deploy').onclick = () => { g.audio.unlock(); g.audio.play('ui'); const v = parseInt($('seedin').value, 10); g.startRunAsync(isNaN(v) ? g.seed : v); };
+    $('retry').onclick = () => { g.audio.play('ui'); g.startRunAsync(g.seed); };
+    $('newrun').onclick = () => { g.audio.play('ui'); g.startRunAsync(Math.floor(Math.random() * 1e6)); };
+    $('next').onclick = () => { g.audio.play('ui'); g.startRunAsync(Math.floor(Math.random() * 1e6)); };
+    $('replay').onclick = () => { g.audio.play('ui'); g.startRunAsync(g.seed); };
     $('resume').onclick = () => g.setPaused(false);
     $('abandon').onclick = () => { g.setPaused(false); g.showTitle(); };
   }
@@ -72,6 +72,7 @@ export class HUD {
     this.show('title', mode === 'title'); this.show('dead', mode === 'dead'); this.show('win', mode === 'extracted'); this.show('pause', mode === 'paused');
     this.root.style.display = mode === 'title' ? 'none' : '';
     document.body.style.cursor = mode === 'playing' ? 'none' : 'default';
+    $('crosshair').style.display = mode === 'playing' ? '' : 'none';
   }
   runStats() {
     const p = this.game.player, t = this.game.runTime;
