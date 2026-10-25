@@ -148,6 +148,7 @@ export class Game {
 
   step(dt) {
     const pl = this.player, input = this.input;
+    if (this.combat) dt *= this.combat.timeScale(dt); // kill hit-stop
     worldUniforms.uTime.value += dt;
     if (input.hit('Escape')) this.setPaused(this.mode === 'playing');
     if (input.hit('Tab') || input.hit('KeyI')) { if (this.mode === 'playing') this.hud.toggleInventory(); }
@@ -202,7 +203,7 @@ export class Game {
       this.extractT += dt;
       // escalating waves while holding the zone
       this.waveT = (this.waveT ?? 1) - dt;
-      if (this.waveT <= 0) { this.waveT = 5.5; this.spawnEvacWave(2 + Math.floor(this.extractT / 7)); }
+      if (this.waveT <= 0) { this.waveT = 4.2; this.spawnEvacWave(3 + Math.floor(this.extractT / 4)); }
       if (Math.floor(prev) !== Math.floor(this.extractT)) this.audio.play('beep', null, { f: 880 });
       if (this.extractT >= this.extractDur) {
         this.mode = 'extracted'; this.audio.play('extracted');
@@ -210,16 +211,20 @@ export class Game {
       }
     } else this.extractT = Math.max(0, this.extractT - dt * 2);
   }
+  // Horde waves while holding the zone: packs pour in from one or two directions at once.
   spawnEvacWave(n) {
     const ex = this.extraction, rng = this.waveRng || (this.waveRng = new RNG(this.seed ^ 0x3a3a));
-    if (this.enemies.alive.filter((e) => e.group === 'wave').length > 10) return;
+    const alive = this.enemies.alive.filter((e) => e.group === 'wave').length;
+    n = Math.min(n, 18 - alive); if (n <= 0) return;
+    const dirs = [rng.range(0, 6.28)]; if (this.extractT > 6) dirs.push(dirs[0] + rng.range(1.6, 4.6));
     for (let i = 0; i < n; i++) {
-      const a = rng.range(0, 6.28), r = rng.range(18, 28);
+      const a = dirs[i % dirs.length] + rng.range(-0.45, 0.45), r = rng.range(17, 26);
       const p = this.nav.nearestWalkable(ex.x + Math.cos(a) * r, ex.z + Math.sin(a) * r, 6);
       if (!p || !this.nav.isReachable(p.x, p.z)) continue;
-      const type = rng.weighted([['mutant', 5], ['raider', 4], ['brute', this.extractT > 10 ? 1.2 : 0]]);
-      const e = this.enemies.spawn(type, p.x, p.z, 'wave'); e.def === undefined || this.enemies.alertE(e, this.player.pos.x, this.player.pos.z, false);
+      const type = rng.weighted([['mutant', 7], ['raider', 3], ['brute', this.extractT > 9 && i === 0 ? 3 : 0]]);
+      const e = this.enemies.spawn(type, p.x, p.z, 'wave'); if (e) this.enemies.alertE(e, this.player.pos.x, this.player.pos.z, false);
     }
+    if (this.hud && this.extractT > 1) this.audio.play('scream', { x: ex.x + Math.cos(dirs[0]) * 15, z: ex.z + Math.sin(dirs[0]) * 15 }, { pitch: 0.8 });
   }
 
   loop(now) {

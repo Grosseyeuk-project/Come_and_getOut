@@ -113,10 +113,18 @@ export class HUD {
   }
   feedKill(type) { this.feed(`${type[0].toUpperCase() + type.slice(1)} eliminated`, '#ff6a50', ''); }
   hitmarker(kill) { const h = $('hitm'); h.classList.toggle('kill', !!kill); this.hitT = kill ? 0.35 : 0.15; this.game.audio.play('hitmarker'); }
-  damageNumber(x, y, z, dmg, crit) {
+  // Damage numbers: rapid hits on the same enemy merge into one growing number (pops on each hit);
+  // crits spawn their own larger yellow number. Numbers rise on an arc and fade.
+  damageNumber(x, y, z, dmg, crit, src = null) {
+    const now = this.dnClock || 0;
+    if (src && !crit) {
+      const d = this.dns.find((d) => d.src === src && !d.crit && now - d.last < 0.45 && d.t < 0.8);
+      if (d) { d.val += dmg; d.last = now; d.t = Math.min(d.t, 0.15); d.pop = 1; d.el.textContent = Math.round(d.val); d.x = x; d.z = z; d.el.classList.toggle('big', d.val >= 50); return; }
+    }
     const el = document.createElement('div'); el.className = 'dn' + (crit ? ' crit' : ''); el.textContent = Math.round(dmg);
     $('dmg').appendChild(el);
-    this.dns.push({ el, x: x + (Math.random() - 0.5) * 0.6, y, z: z + (Math.random() - 0.5) * 0.6, t: 0 });
+    this.dnSide = -(this.dnSide || 1);
+    this.dns.push({ el, src, crit, val: dmg, last: now, pop: 1, x, y, z, t: 0, side: this.dnSide * (0.4 + Math.random() * 0.5) * (crit ? 1.4 : 1) });
     if (this.dns.length > 40) this.dns.shift().el.remove();
   }
   project(x, y, z) {
@@ -195,12 +203,18 @@ export class HUD {
     // toast
     if (this.toastT > 0) { this.toastT -= dt; if (this.toastT <= 0) $('toast').style.opacity = 0; }
     // damage numbers
+    this.dnClock = (this.dnClock || 0) + dt;
     for (let i = this.dns.length - 1; i >= 0; i--) {
-      const d = this.dns[i]; d.t += dt;
-      const s = this.project(d.x, d.y + d.t * 1.4, d.z);
-      d.el.style.left = s.x + 'px'; d.el.style.top = s.y + 'px'; d.el.style.opacity = Math.max(0, 1 - Math.max(0, d.t - 0.5) * 2);
-      d.el.style.transform = `translate(-50%,-50%) scale(${1 + Math.max(0, 0.25 - d.t) * 2})`;
-      if (d.t > 1.1) { d.el.remove(); this.dns.splice(i, 1); }
+      const d = this.dns[i]; d.t += dt; d.pop = Math.max(0, d.pop - dt * 7);
+      const life = d.crit ? 1.25 : 1.0;
+      // screen-space arc: rise fast then hang, drift sideways
+      const s = this.project(d.x, d.y, d.z);
+      const k = 1 - Math.exp(-d.t * 5);
+      const px = s.x + d.side * 46 * k, py = s.y - 38 * k - 14 * d.t + (d.t > 0.6 ? (d.t - 0.6) * (d.t - 0.6) * 60 : 0);
+      d.el.style.left = px + 'px'; d.el.style.top = py + 'px';
+      d.el.style.opacity = Math.max(0, 1 - Math.max(0, d.t - life * 0.6) / (life * 0.4));
+      d.el.style.transform = `translate(-50%,-50%) scale(${1 + d.pop * (d.crit ? 0.9 : 0.5)})`;
+      if (d.t > life) { d.el.remove(); this.dns.splice(i, 1); }
     }
     // enemy bars
     const seen = new Set();

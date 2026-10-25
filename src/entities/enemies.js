@@ -9,7 +9,7 @@ import { clamp, damp } from '../core/rng.js';
 export const DEFS = {
   raider: { hp: 60, speed: 3.6, walk: 1.5, radius: 0.42, sight: 26, ranged: true, range: 20, burst: 3, burstGap: 0.12, aimTime: 0.55, cd: [0.9, 1.7], projSpeed: 30, dmg: 7, xp: 10, dropChance: 0.5, tierBonus: 0 },
   mutant: { hp: 45, speed: 6.4, walk: 1.8, radius: 0.42, sight: 22, melee: true, reach: 1.9, dmg: 13, atkTime: 0.7, hitAt: 0.45, xp: 8, dropChance: 0.3, tierBonus: 0 },
-  brute: { hp: 280, speed: 3.1, walk: 1.3, radius: 0.62, sight: 22, melee: true, slam: true, reach: 2.9, dmg: 32, atkTime: 1.25, hitAt: 0.6, xp: 40, dropChance: 1, tierBonus: 1.5 },
+  brute: { hp: 280, speed: 3.1, walk: 1.3, radius: 0.55, sight: 22, melee: true, slam: true, reach: 2.9, dmg: 32, atkTime: 1.25, hitAt: 0.6, xp: 40, dropChance: 1, tierBonus: 1.5 },
 };
 
 let laserGeo = null;
@@ -30,6 +30,8 @@ export class EnemyManager {
       fireT: 1 + Math.random(), burstLeft: 0, aimT: 0, strafe: Math.random() < 0.5 ? 1 : -1, strafeT: 0, coverT: 0, cover: null,
       atkT: -1, atkCd: 0, stagger: 0, dead: false, deadT: 0, id: this.list.length, losCheck: Math.random() * 0.2, stuckT: 0, lastPos: { x, z }, hpShow: 0, zig: Math.random() * 6 };
     hum.root.position.set(x, 0, z);
+    if (type === 'brute') hum.stepCb = () => { const g = this.game, d = Math.hypot(g.player.pos.x - e.pos.x, g.player.pos.z - e.pos.z); g.fx.puff(e.pos.x, e.pos.z, 1.4, 2); if (e.alert) g.renderer.addTrauma(0.06 * clamp(1 - d / 16, 0, 1)); };
+    else if (type === 'mutant') hum.stepCb = () => { if (Math.random() < 0.35) this.game.fx.puff(e.pos.x, e.pos.z, 0.7, 1); };
     if (def.ranged) { e.laser = new THREE.Mesh(laserGeo, this.laserMat); e.laser.visible = false; e.laser.renderOrder = 5; this.game.scene.add(e.laser); }
     this.list.push(e);
     return e;
@@ -48,35 +50,55 @@ export class EnemyManager {
     }
   }
 
-  damage(e, dmg, dx, dz, crit, hx, hz) {
+  damage(e, dmg, dx, dz, crit, hx, hz, power = 1) {
     if (e.dead) return false;
     const g = this.game;
+    const prevHp = e.hp;
     e.hp -= dmg; e.hpShow = 3;
     g.player.damageDealt += dmg;
-    e.hum.hit(dx, dz, e.type === 'brute' ? 0.4 : 1);
-    if (e.type !== 'brute') { e.vel.x += dx * 2.2; e.vel.z += dz * 2.2; e.stagger = 0.12; }
-    g.fx.impact(hx - dx * 0.2, 1.2, hz - dz * 0.2, -dx, -dz, 'flesh');
-    if (Math.random() < 0.3) g.fx.blood(e.pos.x + dx * 0.8, e.pos.z + dz * 0.8, 0.7);
-    g.hud.damageNumber(e.pos.x, 2.0 * e.hum.K.scale, e.pos.z, dmg, crit);
+    const brute = e.type === 'brute';
+    e.hum.hit(dx, dz, (brute ? 0.45 : 1.2) * Math.min(1.6, 0.6 + power * 0.5));
+    if (!brute) { e.vel.x += dx * 1.6 * power; e.vel.z += dz * 1.6 * power; e.stagger = Math.max(e.stagger, 0.1 + 0.06 * power); }
+    else e.stagger = Math.max(e.stagger, 0.04);
+    const hy = 1.15 * e.hum.K.scale;
+    // brutes wear plate: half the hits spark off the armour
+    if (brute && Math.random() < 0.5) g.fx.impact(hx - dx * 0.25, hy, hz - dz * 0.25, -dx, -dz, 'metal', dx, dz, 0.6);
+    else g.fx.impact(hx - dx * 0.2, hy, hz - dz * 0.2, -dx, -dz, e.type === 'mutant' ? 'ichor' : 'flesh', dx, dz, power);
+    g.hud.damageNumber(e.pos.x, 2.1 * e.hum.K.scale, e.pos.z, dmg, crit, e);
     g.audio.play('flesh', e.pos, { minGap: 0.05 });
     this.alertE(e, g.player.pos.x, g.player.pos.z);
-    if (e.hp <= 0) { this.kill(e, dx, dz); return true; }
+    if (e.hp <= 0) { this.kill(e, dx, dz, { overkill: -e.hp, dmg, power, firstHp: prevHp }); return true; }
     if (Math.random() < 0.3) g.audio.play('enemyHurt', e.pos, { minGap: 0.2 });
     // ranged enemies under fire like to break for cover
     if (e.def.ranged && e.hp < e.maxHp * 0.6 && e.state !== 'cover' && Math.random() < 0.25) this.goCover(e);
     return false;
   }
-  kill(e, dx, dz) {
+  kill(e, dx, dz, info = {}) {
     const g = this.game;
     e.dead = true; e.deadT = 0; e.hp = 0;
-    e.hum.die(dx, dz);
     if (e.laser) e.laser.visible = false;
-    g.fx.blood(e.pos.x + dx * 1.2, e.pos.z + dz * 1.2, 1.6);
+    const brute = e.type === 'brute', sc = e.hum.K.scale;
+    const blood = e.type === 'mutant' ? 'ichor' : 'blood';
+    // overkill -> gibs (shotgun at point blank, DMR crits); otherwise a physical death fall
+    const ok = (info.overkill || 0) + (info.dmg || 0) * ((info.power || 1) - 1);
+    const shot = g.combat.shot && g.combat.shot.get(e);
+    const pellets = shot ? shot.n : 1;
+    const gib = !brute && (pellets >= 6 || ok > e.maxHp * 0.55 || (info.power >= 1.8 && Math.random() < 0.5));
+    const push = brute ? 1.5 : 3 + pellets * 0.9 + (info.power || 1) * 1.5;
+    e.hum.die(dx, dz, { push, gib, kind: e.type, headshot: !gib && Math.random() < 0.25 });
+    g.fx.gore(e.pos.x, e.pos.z, dx, dz, blood, gib ? 14 : brute ? 6 : 3, sc);
+    if (gib) { g.fx.gore(e.pos.x, e.pos.z, dx, dz, blood, 8, sc); g.fx.pool(e.pos.x, e.pos.z, 1.6, blood, 0.1); }
+    else e.poolAt = 0.9; // pool once the body has landed
+    if (brute) { g.fx.dustRing(e.pos.x, e.pos.z, 2.5); g.renderer.addTrauma(0.5); }
+    // kill punctuation: hit-stop + camera trauma (bigger for heavies / gibs)
+    g.combat.hitStop(brute ? 0.12 : gib ? 0.075 : 0.05, brute ? 0.05 : 0.1);
+    g.renderer.addTrauma(brute ? 0.35 : gib ? 0.22 : 0.12);
     g.audio.play('die', e.pos);
     g.audio.play('kill', null);
     g.player.kills++;
     g.loot.onEnemyKilled(e);
     g.hud.feedKill(e.type);
+    if (g.hud.killPop) g.hud.killPop(e.pos.x, 2.4 * sc, e.pos.z, gib);
   }
 
   goCover(e) {
@@ -103,8 +125,19 @@ export class EnemyManager {
     for (const e of this.list) {
       const hum = e.hum, def = e.def;
       if (e.dead) {
-        e.deadT += dt; hum.update(dt, {});
-        if (e.deadT > 9) { e.remove = true; }
+        e.deadT += dt;
+        // corpse slides with its death momentum (friction), collides with walls
+        if (hum.corpseVel) {
+          const cv = hum.corpseVel, k = Math.exp(-(e.deadT < 0.25 ? 2 : 7) * dt);
+          cv.x *= k; cv.z *= k;
+          const np = { x: e.pos.x + cv.x * dt, z: e.pos.z + cv.z * dt }; col.resolveCircle(np, 0.3);
+          e.pos.x = np.x; e.pos.z = np.z; hum.root.position.x = e.pos.x; hum.root.position.z = e.pos.z;
+        }
+        hum.update(dt, {});
+        if (hum.headless > 0 && Math.random() < 0.7) { const n = hum.neckWorld(); g.fx.bloodHit(n.x, n.y, n.z, (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6, undefined, 0.35); }
+        if (e.poolAt && e.deadT > e.poolAt) { e.poolAt = 0; const b = hum.bodyAnchor(); g.fx.pool(b.x, b.z, 1.2 + Math.random() * 0.8 * hum.K.scale, e.type === 'mutant' ? 'ichor' : 'blood', 0); }
+        if (hum.dissolve > 0 && Math.random() < 0.5) { const b = hum.bodyAnchor(); g.fx.embers(b.x, 0.2, b.z, 1); }
+        if (e.deadT > 8.5) { e.remove = true; }
         continue;
       }
       // cheap distance culling: far, unalerted enemies idle
@@ -245,7 +278,6 @@ export class EnemyManager {
       hum.root.position.set(e.pos.x, damp(hum.root.position.y, y, 15, dt), e.pos.z);
       hum.root.rotation.y = e.face;
       hum.update(dt, { speed: Math.hypot(e.vel.x, e.vel.z), moveX: e.vel.x, moveZ: e.vel.z });
-      if (hum.crouch) { hum.hips.position.y -= 0.32; for (const L of hum.legs) { L.hp.rotation.x = -1.0; L.kn.rotation.x = 1.7; L.ft.rotation.x = -0.6; } }
     }
     // remove finished corpses
     for (let i = this.list.length - 1; i >= 0; i--) {

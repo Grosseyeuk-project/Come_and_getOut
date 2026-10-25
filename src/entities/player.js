@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { Humanoid } from './humanoid.js';
 import { weaponModel, rollWeapon, BASES, RARITY } from '../combat/weapons.js';
 import { RNG, clamp, damp } from '../core/rng.js';
+import { ringTex } from '../fx/fxtex.js';
 
 export class Player {
   constructor(game) {
@@ -34,6 +35,11 @@ export class Player {
     this.spotTarget = new THREE.Object3D(); game.scene.add(this.spotTarget); spot.target = this.spotTarget;
     game.scene.add(spot);
     this.dead = false;
+    // ground ring + aim chevron (readability on dark asphalt, The Ascent-style)
+    const rg = new THREE.PlaneGeometry(1.9, 1.9); rg.rotateX(-Math.PI / 2);
+    this.ringMat = new THREE.MeshBasicMaterial({ map: ringTex(), color: new THREE.Color(0.35, 1.3, 1.8), transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+    this.ring = new THREE.Mesh(rg, this.ringMat); this.ring.renderOrder = 2; game.scene.add(this.ring);
+    this.hum.stepCb = () => { if (Math.hypot(this.vel.x, this.vel.z) > 3) this.game.fx.puff(this.pos.x, this.pos.z, 0.6, 1); };
   }
   get weapon() { return this.weapons[this.cur]; }
   equip(i, silent = false) {
@@ -65,7 +71,7 @@ export class Player {
   update(dt, input, aimPoint) {
     const g = this.game;
     this.aim.copy(aimPoint);
-    if (this.dead) { this.hum.update(dt, {}); this.root.position.set(this.pos.x, this.y, this.pos.z); return; }
+    if (this.dead) { this.ring.visible = false; this.hum.update(dt, {}); this.root.position.set(this.pos.x, this.y, this.pos.z); return; }
     this.invuln = Math.max(0, this.invuln - dt);
     // charges
     if (this.charges < this.maxCharges) { this.chargeT += dt; if (this.chargeT >= 1.6) { this.chargeT = 0; this.charges++; } }
@@ -90,7 +96,9 @@ export class Player {
       const sp = 11.5 * (1 - p * 0.55);
       this.vel.x = this.rollDir.x * sp; this.vel.z = this.rollDir.z * sp;
       this.face = Math.atan2(this.rollDir.x, this.rollDir.z);
-      if (this.rollT >= this.rollDur) { this.rollT = -1; }
+      this.trailAcc = (this.trailAcc || 0) + dt * 40;
+      while (this.trailAcc > 1) { this.trailAcc -= 1; g.fx.puff(this.pos.x - this.rollDir.x * 0.3, this.pos.z - this.rollDir.z * 0.3, 0.8, 1); }
+      if (this.rollT >= this.rollDur) { this.rollT = -1; g.fx.puff(this.pos.x, this.pos.z, 1.1, 4); }
     } else {
       if (input.hit('Space') && this.charges > 0) {
         this.charges--; this.chargeT = 0;
@@ -99,7 +107,7 @@ export class Player {
         this.rollDir = { x: dx, z: dz };
         if (w.reloadT > 0) w.reloadT = Math.max(w.reloadT, 0.01);
         g.audio.play('dodge', this.pos);
-        g.fx.dustRing(this.pos.x, this.pos.z, 0.6);
+        g.fx.dustRing(this.pos.x, this.pos.z, 0.8);
       }
       const maxSp = (firing ? 4.4 : 5.6) * (this.healT > 0 ? 0.6 : 1);
       const tx = ix * maxSp, tz = iz * maxSp;
@@ -120,6 +128,10 @@ export class Player {
     // weapons
     this.bloom = Math.max(0, this.bloom - dt * 4);
     w.cooldown -= dt;
+    if (w.pumpT > 0) { // shotgun pump: rack + eject the spent shell
+      const prev = w.pumpT; w.pumpT -= dt;
+      if (prev > 0.14 && w.pumpT <= 0.14) { const m = this.muzzleWorld(), fx = Math.sin(this.face), fz = Math.cos(this.face); g.fx.casing(m.x - fx * 0.5, m.y, m.z - fz * 0.5, fx, fz, true); g.audio.play('reloadEnd', this.pos, { vol: 0.35 }); }
+    }
     if (w.reloadT > 0 && this.rollT < 0) {
       w.reloadT -= dt;
       if (w.reloadT <= 0) {
@@ -147,7 +159,12 @@ export class Player {
     // animate
     this.root.position.set(this.pos.x, this.y, this.pos.z);
     this.root.rotation.y = this.face;
-    this.hum.update(dt, { speed, moveX: this.vel.x, moveZ: this.vel.z, rolling: this.rollT >= 0, rollP: this.rollT / this.rollDur, reloading: w.reloadT > 0 });
+    this.hum.update(dt, { speed, moveX: this.vel.x, moveZ: this.vel.z, rolling: this.rollT >= 0, rollP: this.rollT / this.rollDur, reloading: w.reloadT > 0, reloadP: w.reloadT > 0 ? 1 - w.reloadT / (w.reloadTotal || 1) : 0,
+      pump: w.pumpT > 0 ? Math.sin(clamp(1 - w.pumpT / 0.28, 0, 1) * Math.PI) : 0 });
+    // ground ring follows; chevron points at the aim
+    this.ring.position.set(this.pos.x, this.y + 0.06, this.pos.z);
+    this.ring.rotation.y = Math.atan2(-(aimPoint.z - this.pos.z), aimPoint.x - this.pos.x);
+    this.ringMat.opacity = (this.rollT >= 0 ? 1 : 0.7) * (this.invuln > 0 ? 1 : 0.85);
     // flashlight
     this.spot.position.set(this.pos.x + Math.sin(this.face) * 0.3, 1.7, this.pos.z + Math.cos(this.face) * 0.3);
     this.spotTarget.position.set(this.pos.x + Math.sin(this.face) * 10, 0, this.pos.z + Math.cos(this.face) * 10);
@@ -164,5 +181,5 @@ export class Player {
     this.medkits--; this.healT = 1.4; this.healLeft = 50;
     this.game.audio.play('pickup', null, { tier: 1 }); this.game.hud.dirty();
   }
-  dispose() { this.game.scene.remove(this.root); this.game.scene.remove(this.spot); this.game.scene.remove(this.spotTarget); this.hum.dispose(); }
+  dispose() { this.game.scene.remove(this.ring); this.ringMat.dispose(); this.game.scene.remove(this.root); this.game.scene.remove(this.spot); this.game.scene.remove(this.spotTarget); this.hum.dispose(); }
 }

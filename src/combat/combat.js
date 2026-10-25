@@ -8,46 +8,67 @@ export class Combat {
   constructor(game) {
     this.game = game;
     this.projectiles = [];
+    this.stopT = 0; this.stopScale = 1; this.shot = null;
     const g = new THREE.SphereGeometry(0.07, 8, 6); g.scale(1, 1, 5);
     this.projGeo = g;
     this.projMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 1.1, 0.3), fog: false });
   }
 
   playerFire(pl, w) {
-    const g = this.game, B = BASES[w.base], s = w.stats;
+    const g = this.game, B = BASES[w.base], s = w.stats, shotgun = B.pellets > 1;
     w.cooldown = 60 / s.rpm; w.mag--;
     pl.shotsFired++;
     const m = pl.muzzleWorld();
-    const ox = m.x, oz = m.z;
     let ax = pl.aim.x - pl.pos.x, az = pl.aim.z - pl.pos.z; const al = Math.hypot(ax, az) || 1; ax /= al; az /= al;
     // fire from slightly behind muzzle (so point-blank walls still register) along aim
     const sx = pl.pos.x + ax * 0.3, sz = pl.pos.z + az * 0.3;
     const moving = Math.hypot(pl.vel.x, pl.vel.z) > 1;
-    const spreadDeg = s.spread * (moving ? 1.25 : 1) + pl.bloom * (B.pellets > 1 ? 0 : 4);
+    const spreadDeg = s.spread * (moving ? 1.25 : 1) + pl.bloom * (shotgun ? 0 : 4);
     pl.bloom = Math.min(1, pl.bloom + B.recoil * 0.25);
     let anyHit = false, kill = false;
+    this.shot = new Map(); // enemy -> { n, dmg } accumulated over pellets (knockback / gib decisions)
     for (let p = 0; p < s.pellets; p++) {
-      const a = ((Math.random() - 0.5) * 2 * spreadDeg * Math.PI) / 180 * (B.pellets > 1 ? 1 : Math.random());
+      // shotgun: even fan with jitter so the pattern reads as a spread, not a random clump
+      const a = shotgun ? (((p + 0.5) / s.pellets - 0.5) * 2 + (Math.random() - 0.5) * 0.35) * spreadDeg * Math.PI / 180
+        : ((Math.random() - 0.5) * 2 * spreadDeg * Math.PI) / 180 * Math.random();
       const ca = Math.cos(a), sa = Math.sin(a);
       const dx = ax * ca - az * sa, dz = ax * sa + az * ca;
-      const range = s.range * (B.pellets > 1 ? 0.85 + Math.random() * 0.3 : 1);
-      const r = this.trace(sx, sz, dx, dz, range, s.dmg, s.crit, B.pierce || 0, s.range);
+      const range = s.range * (shotgun ? 0.85 + Math.random() * 0.3 : 1);
+      const r = this.trace(sx, sz, dx, dz, range, s.dmg, s.crit, B.pierce || 0, s.range, shotgun ? 0.55 : w.base === 'dmr' ? 1.8 : 1);
       if (r.hit) anyHit = true; if (r.kill) kill = true;
-      const ex = r.x, ez = r.z;
-      if (p < 4 || Math.random() < 0.4) g.fx.tracer(m.x, m.y, m.z, ex, r.y, ez, B.pellets > 1 ? 0xffb060 : 0xffd090, B.pellets > 1 ? 0.035 : 0.055, 170);
+      g.fx.tracer(m.x, m.y, m.z, r.x, r.y, r.z, shotgun ? 0xffa050 : w.base === 'dmr' ? 0xfff0c0 : 0xffd090, shotgun ? 0.04 : w.base === 'dmr' ? 0.09 : 0.06, shotgun ? 150 : 190);
     }
-    g.fx.muzzle(m.x, m.y, m.z, ax, az, B.pellets > 1 ? 1.4 : w.base === 'dmr' ? 1.2 : 1);
-    g.fx.casing(m.x - ax * 0.4, m.y, m.z - az * 0.4, ax, az, w.base === 'shotgun');
+    // shotgun knockback: proportional to pellets that connected
+    for (const [e, h] of this.shot) {
+      const kb = shotgun ? h.n * 1.1 : (w.base === 'dmr' ? 2.5 : 0.4);
+      const res = e.type === 'brute' ? 0.25 : 1;
+      e.vel.x += h.dx * kb * res; e.vel.z += h.dz * kb * res;
+      if (shotgun && h.n >= 3 && !e.dead) { e.stagger = Math.max(e.stagger, 0.35 * res); e.hum.hit(h.dx, h.dz, 2.2 * res); }
+    }
+    this.shot = null;
+    g.fx.muzzle(m.x, m.y, m.z, ax, az, shotgun ? 1.9 : w.base === 'dmr' ? 1.4 : w.base === 'smg' ? 0.8 : 1);
+    if (shotgun) w.pumpT = 0.28; // casing ejected on the pump
+    else g.fx.casing(m.x - ax * 0.45, m.y + 0.03, m.z - az * 0.45, ax, az, false);
     g.audio.play(B.sound, pl.pos, { minGap: 0.02 });
-    g.renderer.addTrauma(B.shake);
-    g.renderer.kick(ax, az, B.recoil * 0.25);
-    pl.hum.recoil = Math.min(1, pl.hum.recoil + B.recoil);
+    g.renderer.addTrauma(B.shake * (shotgun ? 1.3 : 0.9));
+    g.renderer.kick(ax, az, B.recoil * (shotgun ? 0.75 : 0.32));
+    pl.hum.recoil = Math.min(1.4, pl.hum.recoil + B.recoil * (shotgun ? 1.4 : 1));
+    // shooter is shoved back a touch by heavy weapons
+    if (shotgun || w.base === 'dmr') { pl.vel.x -= ax * (shotgun ? 2.2 : 1.2); pl.vel.z -= az * (shotgun ? 2.2 : 1.2); }
     g.enemies.noise(pl.pos.x, pl.pos.z, 32);
     if (anyHit) g.hud.hitmarker(kill);
     g.hud.dirty();
   }
 
-  trace(sx, sz, dx, dz, range, dmg, crit, pierce, fullRange) {
+  // brief global slow-down on kills (hit-stop); game.step scales dt by timeScale()
+  hitStop(dur, scale = 0.08) { if (dur > this.stopT) { this.stopT = dur; this.stopScale = scale; } }
+  timeScale(dt) {
+    if (!(this.stopT > 0)) return 1;
+    this.stopT -= dt; // real time
+    return this.stopScale;
+  }
+
+  trace(sx, sz, dx, dz, range, dmg, crit, pierce, fullRange, power = 1) {
     const g = this.game;
     const ex = sx + dx * range, ez = sz + dz * range;
     const wall = g.col.raycast(sx, sz, ex, ez, BULLET_Y);
@@ -73,20 +94,22 @@ export class Combat {
       const isCrit = Math.random() < crit;
       const d = dmg * fall * (isCrit ? 2 : 1);
       const hx = sx + dx * dist, hz = sz + dz * dist;
-      if (g.enemies.damage(h.e, d, dx, dz, isCrit, hx, hz)) kill = true;
+      if (this.shot) { const a = this.shot.get(h.e) || { n: 0, dmg: 0, dx: 0, dz: 0 }; a.n++; a.dmg += d; a.dx = dx; a.dz = dz; this.shot.set(h.e, a); }
+      if (g.enemies.damage(h.e, d, dx, dz, isCrit, hx, hz, power)) kill = true;
       hit = true;
       endT = h.t; y = 1.2;
       if (pierce-- <= 0) break;
     }
     const x = sx + dx * range * endT, z = sz + dz * range * endT;
     if (!hit && wall) {
-      const kind = wall.box.kind === 'car' || wall.box.kind === 'container' || wall.box.kind === 'barrel' || wall.box.kind === 'pole' ? 'metal' : 'concrete';
-      g.fx.impact(x - dx * 0.05, BULLET_Y, z - dz * 0.05, wall.nx, wall.nz, kind);
-      if (Math.random() < 0.5) g.audio.play(kind === 'metal' ? 'impactMetal' : 'impact', { x, z }, { minGap: 0.04 });
+      const k = wall.box.kind;
+      const kind = k === 'car' || k === 'container' || k === 'barrel' || k === 'pole' || k === 'fence' ? 'metal' : k === 'tree' || k === 'tent' ? 'wood' : 'concrete';
+      g.fx.impact(x - dx * 0.05, BULLET_Y, z - dz * 0.05, wall.nx, wall.nz, kind, dx, dz, power);
+      if (Math.random() < 0.6) g.audio.play(kind === 'metal' ? 'impactMetal' : 'impact', { x, z }, { minGap: 0.04 });
     } else if (!hit) {
-      // bullet lands on ground at max range
-      g.fx.impact(x, 0.05, z, 0, 0, 'concrete');
-      y = 0.2;
+      // bullet lands on the ground at max range: dirt kick-up
+      g.fx.impact(x, 0.05, z, -dx * 0.4, -dz * 0.4, 'ground', dx, dz, power * 0.7);
+      y = 0.1;
     }
     return { hit, kill, x, z, y };
   }
@@ -114,14 +137,14 @@ export class Combat {
         const tp = Math.max(0, Math.min(segL, fx * p.dx + fz * p.dz));
         const cx = p.x + p.dx * tp - pl.pos.x, cz = p.z + p.dz * tp - pl.pos.z;
         if (cx * cx + cz * cz < 0.45 * 0.45 && (!wall || wall.t * segL > tp)) {
-          if (pl.damage(p.dmg, p.x, p.z)) { g.fx.impact(pl.pos.x - p.dx * 0.3, 1.2, pl.pos.z - p.dz * 0.3, -p.dx, -p.dz, 'flesh'); g.audio.play('flesh', pl.pos); done = true; }
+          if (pl.damage(p.dmg, p.x, p.z)) { g.fx.impact(pl.pos.x - p.dx * 0.2, 1.2, pl.pos.z - p.dz * 0.2, -p.dx, -p.dz, 'flesh', p.dx, p.dz, 0.6); g.audio.play('flesh', pl.pos); done = true; }
         }
       }
-      if (!done && wall) { done = true; g.fx.impact(wall.x - p.dx * 0.05, BULLET_Y, wall.z - p.dz * 0.05, wall.nx, wall.nz, 'concrete'); }
+      if (!done && wall) { done = true; g.fx.impact(wall.x - p.dx * 0.05, BULLET_Y, wall.z - p.dz * 0.05, wall.nx, wall.nz, 'concrete', p.dx, p.dz, 0.6); }
       p.x = nx; p.z = nz; p.m.position.set(nx, BULLET_Y, nz);
       if (Math.random() < 0.5) g.fx.add.emit({ x: nx, y: BULLET_Y, z: nz, life: 0.12, s0: 0.12, s1: 0.02, c0: [2, 0.5, 0.15, 0.8], c1: [1, 0.2, 0.05, 0] });
       if (done) { g.scene.remove(p.m); this.projectiles.splice(i, 1); }
     }
   }
-  clear() { for (const p of this.projectiles) this.game.scene.remove(p.m); this.projectiles.length = 0; }
+  clear() { for (const p of this.projectiles) this.game.scene.remove(p.m); this.projectiles.length = 0; this.stopT = 0; }
 }

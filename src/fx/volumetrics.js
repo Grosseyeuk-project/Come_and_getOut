@@ -17,6 +17,7 @@ export class Volumetrics {
     this.glowTex = T.softSprite('glow', 1, 0);
   }
   add(pos, color, source, len = 6, radius = 2.6) {
+    if (source && source.color) color = source.color.getHex(); // lighting hook: follow the palette lamp colour
     const mat = new THREE.ShaderMaterial({ uniforms: { uColor: { value: new THREE.Color(color) }, uI: { value: 1 } }, vertexShader: VS, fragmentShader: FS, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
     const m = new THREE.Mesh(this.geo, mat);
     m.position.copy(pos); m.scale.set(radius / 2.6, len / 6, radius / 2.6); m.renderOrder = 7;
