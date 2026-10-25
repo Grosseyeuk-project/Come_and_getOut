@@ -3,47 +3,13 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { setAnisotropy } from './textures.js';
+import { ScatterShader, FinalShader, MAX_SCATTER } from './post.js';
+import { installAtmosphere } from './atmosphere.js';
 import { damp, vnoise } from '../core/rng.js';
-
-const GradeShader = {
-  uniforms: {
-    tDiffuse: { value: null }, uTime: { value: 0 }, uVignette: { value: 0.9 }, uGrain: { value: 0.05 },
-    uSat: { value: 0.82 }, uContrast: { value: 1.12 }, uTint: { value: new THREE.Color(1.0, 0.97, 0.92) },
-    uShadowTint: { value: new THREE.Color(0.86, 0.95, 1.08) }, uDamage: { value: 0 }, uChroma: { value: 0.0015 },
-    uFade: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) },
-  },
-  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-  fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uTime, uVignette, uGrain, uSat, uContrast, uDamage, uChroma, uFade;
-    uniform vec3 uTint, uShadowTint; uniform vec2 uRes; varying vec2 vUv;
-    float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
-    void main(){
-      vec2 c = vUv - 0.5; float r2 = dot(c,c);
-      vec2 off = c * (uChroma + uDamage * 0.004) * (1.0 + r2 * 4.0);
-      vec3 col;
-      col.r = texture2D(tDiffuse, vUv + off).r;
-      col.g = texture2D(tDiffuse, vUv).g;
-      col.b = texture2D(tDiffuse, vUv - off).b;
-      float l = dot(col, vec3(0.299,0.587,0.114));
-      col = mix(vec3(l), col, uSat);
-      col = (col - 0.5) * uContrast + 0.5;
-      // split toning: cool shadows, warm highlights
-      col *= mix(uShadowTint, uTint, smoothstep(0.0, 0.6, l));
-      float vig = 1.0 - smoothstep(0.2, 0.85, length(c * vec2(1.0, 0.85)) * uVignette * 1.25);
-      col *= mix(0.35, 1.0, vig);
-      // damage: red pulsing edge
-      float edge = smoothstep(0.25, 0.75, length(c) * 1.4);
-      col = mix(col, vec3(0.45, 0.02, 0.02), edge * uDamage * 0.8);
-      col += (h(vUv * uRes + fract(uTime) * 100.0) - 0.5) * uGrain;
-      col = mix(col, vec3(0.0), uFade);
-      gl_FragColor = vec4(max(col, 0.0), 1.0);
-    }`,
-};
 
 export function detectQuality(renderer) {
   const q = new URLSearchParams(location.search).get('q');
@@ -60,11 +26,12 @@ export class Renderer {
     this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: true });
     const r = this.renderer;
     this.quality = detectQuality(r);
+    installAtmosphere(this.quality); // global shader-chunk patches: must precede any material compile
     r.setPixelRatio(Math.min(devicePixelRatio, this.quality === 'high' ? 1.5 : 1));
     r.setSize(innerWidth, innerHeight);
     r.shadowMap.enabled = true;
     r.shadowMap.type = this.quality === 'low' ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
-    r.toneMapping = THREE.ACESFilmicToneMapping;
+    r.toneMapping = THREE.NoToneMapping; // tonemapping + grade happen in FinalShader (HDR linear until then)
     r.toneMappingExposure = 1.0;
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.info.autoReset = false; // composer renders several passes; we reset once per frame for honest stats
@@ -79,8 +46,31 @@ export class Renderer {
   setupPost(scene) {
     this.scene = scene;
     const r = this.renderer, w = innerWidth, h = innerHeight;
-    this.composer = new EffectComposer(r);
+    // scene target carries a depth texture so the scatter pass can integrate light along each view ray
+    const rt = new THREE.WebGLRenderTarget(w * r.getPixelRatio(), h * r.getPixelRatio(), { type: THREE.HalfFloatType, depthTexture: new THREE.DepthTexture(w, h) });
+    this.composer = new EffectComposer(r, rt);
+    this.composer.setPixelRatio(r.getPixelRatio());
+    // clone() shares the depth texture's Source (= same GL texture) -> feedback loop; give rt2 its own
+    this.composer.renderTarget2.depthTexture = new THREE.DepthTexture(w, h);
     this.composer.addPass(new RenderPass(scene, this.camera));
+    // NaN/Inf guard + HDR clamp + in-scatter, before AO/bloom: one bad pixel would otherwise poison the bloom
+    // mips and black out the whole frame (muzzle flash / impact stacks).
+    const sp = this.scatter = new ShaderPass(ScatterShader), cam = this.camera, tmp = new THREE.Vector3();
+    const base = sp.render.bind(sp);
+    sp.render = (renderer, writeBuffer, readBuffer, dt, mask) => {
+      const u = sp.uniforms, sc = this.composer.passes[0].scene, lights = sc && sc.userData.scatterLights;
+      u.tDepth.value = readBuffer.depthTexture; u.uProjInv.value.copy(cam.projectionMatrixInverse);
+      let n = 0;
+      if (lights && this.quality !== 'low') for (const l of lights) {
+        if (n >= MAX_SCATTER || !(l.intensity > 0.01)) continue;
+        tmp.copy(l.position).applyMatrix4(cam.matrixWorldInverse);
+        u.uL.value[n].set(tmp.x, tmp.y, tmp.z, l.distance || 20);
+        u.uLC.value[n].set(l.color.r, l.color.g, l.color.b).multiplyScalar(l.intensity); n++;
+      }
+      u.uN.value = n; u.uK.value = (sc && sc.userData.grade && sc.userData.grade.scatter) || 0;
+      base(renderer, writeBuffer, readBuffer, dt, mask);
+    };
+    this.composer.addPass(sp);
     if (this.quality === 'high') {
       try {
         this.ao = new GTAOPass(scene, this.camera, w, h);
@@ -100,10 +90,9 @@ export class Renderer {
         this.composer.addPass(this.ao);
       } catch (e) { console.warn('GTAO disabled', e); }
     }
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(w / 2, h / 2), 0.55, 0.5, 0.82);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(w / 2, h / 2), 0.6, 0.55, 0.9);
     this.composer.addPass(this.bloom);
-    this.composer.addPass(new OutputPass());
-    this.grade = new ShaderPass(GradeShader);
+    this.grade = new ShaderPass(FinalShader);
     this.composer.addPass(this.grade);
     if (this.quality !== 'low') { this.smaa = new SMAAPass(w * r.getPixelRatio(), h * r.getPixelRatio()); this.composer.addPass(this.smaa); }
     this.resize();
@@ -143,7 +132,14 @@ export class Renderer {
   }
 
   render(dt) {
-    this.grade.uniforms.uTime.value += dt;
+    const gu = this.grade.uniforms;
+    gu.uTime.value += dt;
+    const sc = this.composer.passes[0].scene, gp = sc && sc.userData.grade;
+    if (gp && this._gradeFor !== gp) { // palette grade (set by Lighting) - applied once per world
+      this._gradeFor = gp;
+      gu.uExposure.value = gp.exposure; gu.uContrast.value = gp.contrast; gu.uSat.value = gp.sat; gu.uWarmSat.value = gp.warmSat;
+      gu.uTint.value.setRGB(...gp.tint); gu.uShadowTint.value.setRGB(...gp.shadowTint); gu.uLift.value.setRGB(...gp.lift);
+    }
     this.composer.render(dt);
   }
 }
