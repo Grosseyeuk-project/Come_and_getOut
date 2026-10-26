@@ -99,10 +99,10 @@ export class Screens {
     const cells = [['Time', fmtT(g.runTime)], ['Kills', p.kills], ['Damage', Math.round(p.damageDealt).toLocaleString()], ['Shots', p.shotsFired], ['Salvage', p.scrap], ...extra];
     return cells.map(([l, v]) => `<div><span>${l}</span><b>${v}</b></div>`).join('');
   }
-  haul(items) {
+  haul(items, delay = 0.25) {
     const sorted = items.filter(Boolean).slice().sort((a, b) => RARITY[b.rarity].tier - RARITY[a.rarity].tier || (b.value || 0) - (a.value || 0));
     if (!sorted.length) return '<div class="none">Nothing but the clothes on your back.</div>';
-    return sorted.slice(0, 8).map((it, i) => `<div class="hi r${RARITY[it.rarity].tier}" style="--rc:${RARITY[it.rarity].color};animation-delay:${0.25 + i * 0.12}s">${iconHTML(it, 84, 32)}<div><div class="nm">${esc(it.name)}</div><div class="ty">${esc(itemType(it))}${it.kind === 'weapon' ? ' · ' + dps(it) + ' DPS' : ''}</div></div><b>${it.value || ''}</b></div>`).join('') + (sorted.length > 8 ? `<div class="none">+${sorted.length - 8} more</div>` : '');
+    return sorted.slice(0, 8).map((it, i) => `<div class="hi r${RARITY[it.rarity].tier}" style="--rc:${RARITY[it.rarity].color};animation-delay:${delay + i * 0.12}s">${iconHTML(it, 84, 32)}<div><div class="nm">${esc(it.name)}</div><div class="ty">${esc(itemType(it))}${it.kind === 'weapon' ? ' · ' + dps(it) + ' DPS' : ''}</div></div><b>${it.value || ''}</b></div>`).join('') + (sorted.length > 8 ? `<div class="none">+${sorted.length - 8} more</div>` : '');
   }
   showDeath() {
     const g = this.game, p = g.player, L = g.layout;
@@ -114,7 +114,7 @@ export class Screens {
     const g = this.game, p = g.player;
     p.god = true;
     const items = [...p.weapons, ...p.backpack], total = items.reduce((s, it) => s + (it ? it.value || 0 : 0), 0) + p.scrap;
-    $('whaul').innerHTML = this.haul(items);
+    $('whaul').innerHTML = this.haul(items, 2.6);
     $('wstats').innerHTML = this.statGrid();
     this.countTo = total; this.countT = 0; $('wval').textContent = '0';
     if (this.ship) this.ship.dispose();
