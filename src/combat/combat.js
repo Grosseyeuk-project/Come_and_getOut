@@ -20,6 +20,15 @@ export class Combat {
     pl.shotsFired++;
     const m = pl.muzzleWorld();
     let ax = pl.aim.x - pl.pos.x, az = pl.aim.z - pl.pos.z; const al = Math.hypot(ax, az) || 1; ax /= al; az /= al;
+    // soft aim assist (twin-stick convention): snap toward the enemy nearest the aim ray inside a narrow cone
+    { let best = null, bestA = shotgun ? 0.05 : 0.11;
+      for (const e of g.enemies.list) {
+        if (e.dead) continue;
+        const ex = e.pos.x - pl.pos.x, ez = e.pos.z - pl.pos.z, d = Math.hypot(ex, ez); if (d < 0.5 || d > s.range) continue;
+        const ang = Math.acos(Math.max(-1, Math.min(1, (ex * ax + ez * az) / d))) - Math.atan2(e.radius, d);
+        if (ang < bestA && g.col.los(pl.pos.x, pl.pos.z, e.pos.x, e.pos.z, BULLET_Y)) { bestA = ang; best = { x: ex / d, z: ez / d }; }
+      }
+      if (best) { ax = ax * 0.25 + best.x * 0.75; az = az * 0.25 + best.z * 0.75; const l = Math.hypot(ax, az) || 1; ax /= l; az /= l; } }
     // fire from slightly behind muzzle (so point-blank walls still register) along aim
     const sx = pl.pos.x + ax * 0.3, sz = pl.pos.z + az * 0.3;
     const moving = Math.hypot(pl.vel.x, pl.vel.z) > 1;
@@ -36,7 +45,7 @@ export class Combat {
       const range = s.range * (shotgun ? 0.85 + Math.random() * 0.3 : 1);
       const r = this.trace(sx, sz, dx, dz, range, s.dmg, s.crit, B.pierce || 0, s.range, shotgun ? 0.55 : w.base === 'dmr' ? 1.8 : 1);
       if (r.hit) anyHit = true; if (r.kill) kill = true;
-      g.fx.tracer(m.x, m.y, m.z, r.x, r.y, r.z, shotgun ? 0xffa050 : w.base === 'dmr' ? 0xfff0c0 : 0xffd090, shotgun ? 0.03 : w.base === 'dmr' ? 0.06 : 0.04, shotgun ? 150 : 190);
+      g.fx.bullet(m.x, m.y, m.z, r.x, r.y, r.z, w.base);
     }
     // shotgun knockback: proportional to pellets that connected
     for (const [e, h] of this.shot) {
@@ -77,7 +86,7 @@ export class Combat {
     const hits = [];
     for (const e of g.enemies.list) {
       if (e.dead) continue;
-      const r = e.radius + 0.12;
+      const r = e.radius + 0.2;
       const fx = e.pos.x - sx, fz = e.pos.z - sz;
       const tp = (fx * dx + fz * dz) / range; if (tp < 0 || tp > tMax + r / range) continue;
       const px = sx + dx * range * tp - e.pos.x, pz = sz + dz * range * tp - e.pos.z;

@@ -3,7 +3,7 @@
 // (sight cone + LOS, gunfire noise, group alerts) and flow-field pathing toward the player.
 import * as THREE from 'three';
 import { Humanoid } from './humanoid.js';
-import { weaponModel } from '../combat/weapons.js';
+import { weaponModel, RARITY } from '../combat/weapons.js';
 import { clamp, damp } from '../core/rng.js';
 
 export const DEFS = {
@@ -65,6 +65,7 @@ export class EnemyManager {
     if ((brute && Math.random() < 0.5) || (e.type === 'raider' && Math.random() < 0.2)) g.fx.impact(hx - dx * 0.25, hy, hz - dz * 0.25, -dx, -dz, 'metal', dx, dz, 0.6);
     else g.fx.impact(hx - dx * 0.2, hy, hz - dz * 0.2, -dx, -dz, e.type === 'mutant' ? 'ichor' : 'flesh', dx, dz, power);
     g.hud.damageNumber(e.pos.x, 2.1 * e.hum.K.scale, e.pos.z, dmg, crit, e);
+    if (power >= 1.4 || crit) g.combat.hitStop(0.022, 0.3); // micro hit-pause on heavy hits
     g.audio.play('flesh', e.pos, { minGap: 0.05 });
     this.alertE(e, g.player.pos.x, g.player.pos.z);
     if (e.hp <= 0) { this.kill(e, dx, dz, { overkill: -e.hp, dmg, power, firstHp: prevHp }); return true; }
@@ -84,19 +85,25 @@ export class EnemyManager {
     const shot = g.combat.shot && g.combat.shot.get(e);
     const pellets = shot ? shot.n : 1;
     const gib = !brute && (pellets >= 6 || ok > e.maxHp * 0.55 || (info.power >= 1.8 && Math.random() < 0.5));
-    const push = brute ? 1.5 : 3 + pellets * 0.9 + (info.power || 1) * 1.5;
+    const push = brute ? 2.2 : 5 + pellets * 1.1 + (info.power || 1) * 2;
     e.hum.die(dx, dz, { push, gib, kind: e.type, headshot: !gib && Math.random() < 0.25 });
     g.fx.gore(e.pos.x, e.pos.z, dx, dz, blood, gib ? 14 : brute ? 6 : 3, sc);
+    g.fx.killBurst(e.pos.x, 1.1 * sc, e.pos.z, dx, dz, e.type, sc);
     if (gib) { g.fx.gore(e.pos.x, e.pos.z, dx, dz, blood, 8, sc); g.fx.pool(e.pos.x, e.pos.z, 1.6, blood, 0.1); }
     else e.poolAt = 0.9; // pool once the body has landed
     if (brute) { g.fx.dustRing(e.pos.x, e.pos.z, 2.5); g.renderer.addTrauma(0.5); }
     // kill punctuation: hit-stop + camera trauma (bigger for heavies / gibs)
-    g.combat.hitStop(brute ? 0.12 : gib ? 0.075 : 0.05, brute ? 0.05 : 0.1);
-    g.renderer.addTrauma(brute ? 0.35 : gib ? 0.22 : 0.12);
+    g.combat.hitStop(brute ? 0.14 : gib ? 0.09 : 0.065, brute ? 0.04 : 0.08);
+    g.renderer.addTrauma(brute ? 0.4 : gib ? 0.28 : 0.18);
     g.audio.play('die', e.pos);
     g.audio.play('kill', null);
     g.player.kills++;
+    const nd = g.loot.drops.length;
     g.loot.onEnemyKilled(e);
+    for (let i = nd; i < g.loot.drops.length; i++) { // bright loot pop in the drop's rarity colour
+      const d = g.loot.drops[i], c = new THREE.Color(RARITY[d.item.rarity] ? RARITY[d.item.rarity].hex : 0xffffff);
+      g.fx.lootPop(d.x, d.z, [c.r * 4, c.g * 4, c.b * 4]);
+    }
     g.hud.feedKill(e.type);
     if (g.hud.killPop) g.hud.killPop(e.pos.x, 2.4 * sc, e.pos.z, gib);
   }

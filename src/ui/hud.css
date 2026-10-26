@@ -43,9 +43,11 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0a0a0b; col
 .dn.big { font-size: 21px; color: #ffd9b0; }
 .dn.crit { color: #ffcf3a; font-size: 26px; font-style: italic; text-shadow: 0 2px 0 #3a1a00, 0 0 4px #000, 0 0 14px rgba(255,140,20,0.65); }
 .dn.crit::after { content: '!'; margin-left: 1px; }
-.ebar { position: absolute; width: 46px; height: 4px; margin-left: -23px; background: rgba(0,0,0,0.6); border: 1px solid rgba(0,0,0,0.6); }
+.ebar { position: absolute; width: 50px; height: 5px; margin-left: -25px; background: rgba(0,0,0,0.65); border: 1px solid rgba(0,0,0,0.8); box-shadow: 0 0 4px rgba(0,0,0,0.6); }
+.ebar.elite { width: 80px; margin-left: -40px; height: 6px; }
+.ebar.elite i { background: #ff8a20; }
 .ebar i { display: block; height: 100%; background: #e2463a; }
-#prompt { position: absolute; transform: translate(-50%, -100%); padding: 9px 12px; min-width: 210px; border-top: 2px solid #888; }
+#prompt { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); padding: 9px 12px; min-width: 210px; border-top: 2px solid #888; }
 #prompt .n { font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
 #prompt .r { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; margin-top: 2px; }
 #prompt .s { font-size: 12px; color: var(--txt); margin-top: 6px; line-height: 1.5; }
@@ -55,8 +57,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0a0a0b; col
 .fi { padding: 5px 10px; font-size: 12px; border-left: 3px solid; background: rgba(10,10,12,0.6); animation: fin 0.25s ease-out; }
 .fi small { color: var(--dim); margin-left: 8px; }
 @keyframes fin { from { transform: translateX(-20px); opacity: 0; } to { transform: none; opacity: 1; } }
-#toast { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); font-size: 14px; letter-spacing: 0.2em; text-transform: uppercase; text-shadow: 0 1px 4px #000; transition: opacity 0.3s; }
-#extractbar { position: absolute; top: 30%; left: 50%; transform: translateX(-50%); width: 360px; text-align: center; padding: 10px 14px; }
+#toast { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); font-size: 14px; letter-spacing: 0.2em; text-transform: uppercase; text-shadow: 0 1px 4px #000; transition: opacity 0.3s; }
+#extractbar { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 360px; text-align: center; padding: 10px 14px; }
 #extractbar .bar { height: 6px; background: rgba(255,255,255,0.08); margin-top: 8px; }
 #extractbar .bar i { display: block; height: 100%; background: #5dff8a; width: 0; box-shadow: 0 0 10px #5dff8a; }
 #inventory { position: absolute; inset: 0; background: rgba(5,5,6,0.72); display: flex; align-items: center; justify-content: center; pointer-events: auto; }

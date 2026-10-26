@@ -15,10 +15,10 @@ const UP_NEG = new V(0, -1, 0);
 const _v1 = new V(), _v2 = new V(), _v3 = new V(), _v4 = new V(), _q = new THREE.Quaternion();
 
 const KINDS = {
-  player: { cloth: 0x4c545c, pants: 0x2c3034, vest: 0x2a2e33, plate: 0x9aa2a8, skin: 0xa07e66, boots: 0x1a1714, gloves: 0x18191a, accent: 0x38d8ff, eye: 0x38d8ff, scale: 1.22, rim: [0.35, 0.55, 0.7] },
-  raider: { cloth: 0x5a2a18, pants: 0x3a3226, vest: 0x2e241c, plate: 0x6a4a2e, skin: 0x8a6a56, boots: 0x1c1712, gloves: 0x2a1d14, accent: 0xff3a14, eye: 0xff2a10, scale: 1.14, rim: [0.32, 0.14, 0.07] },
-  mutant: { cloth: 0x2e2a22, pants: 0x2b2820, vest: 0x2a2620, plate: 0x3a3a30, skin: 0x8a9478, boots: 0x3b382e, gloves: 0x7a8468, accent: 0xb4ff3a, eye: 0xd4ff30, scale: 1.12, rim: [0.22, 0.34, 0.08] },
-  brute: { cloth: 0x2a221c, pants: 0x2a221c, vest: 0x3a2a20, plate: 0x6a6258, skin: 0x7a6252, boots: 0x2a2018, gloves: 0x3a3430, accent: 0xff6a1a, eye: 0xff8a20, scale: 1.72, rim: [0.4, 0.22, 0.08] },
+  player: { cloth: 0x4c545c, pants: 0x2c3034, vest: 0x2a2e33, plate: 0x9aa2a8, skin: 0xa07e66, boots: 0x1a1714, gloves: 0x18191a, accent: 0x38d8ff, eye: 0x38d8ff, scale: 1.22, rim: [0.5, 0.85, 1.1] },
+  raider: { cloth: 0x5a2a18, pants: 0x3a3226, vest: 0x2e241c, plate: 0x6a4a2e, skin: 0x8a6a56, boots: 0x1c1712, gloves: 0x2a1d14, accent: 0xff3a14, eye: 0xff2a10, scale: 1.14, rim: [0.75, 0.18, 0.08] },
+  mutant: { cloth: 0x2e2a22, pants: 0x2b2820, vest: 0x2a2620, plate: 0x3a3a30, skin: 0x8a9478, boots: 0x3b382e, gloves: 0x7a8468, accent: 0xb4ff3a, eye: 0xd4ff30, scale: 1.12, rim: [0.4, 0.75, 0.1] },
+  brute: { cloth: 0x2a221c, pants: 0x2a221c, vest: 0x3a2a20, plate: 0x6a6258, skin: 0x7a6252, boots: 0x2a2018, gloves: 0x3a3430, accent: 0xff6a1a, eye: 0xff8a20, scale: 1.72, rim: [0.85, 0.4, 0.08] },
 };
 const RAIDER_CLOTH = [0x5a2a18, 0x6a3a1a, 0x4a3a28, 0x5e4a30, 0x3a2e2a, 0x6a2420];
 
@@ -38,7 +38,7 @@ export class Humanoid {
       skin: new THREE.MeshStandardMaterial({ color: K.skin, roughness: 0.6 }),
       boots: new THREE.MeshStandardMaterial({ color: K.boots, roughness: 0.6 }),
       gloves: new THREE.MeshStandardMaterial({ color: K.gloves, roughness: 0.7 }),
-      accent: new THREE.MeshStandardMaterial({ color: 0x000000, emissive: K.accent, emissiveIntensity: kind === 'mutant' ? 1.4 : 3 }),
+      accent: new THREE.MeshStandardMaterial({ color: 0x000000, emissive: K.accent, emissiveIntensity: kind === 'mutant' ? 2.6 : 3.5 }),
       eye: new THREE.MeshStandardMaterial({ color: 0x000000, emissive: K.eye, emissiveIntensity: 6 }),
       bone: new THREE.MeshStandardMaterial({ color: 0xc8bca0, roughness: 0.6 }),
       rust: new THREE.MeshStandardMaterial({ color: 0x5a3a26, roughness: 0.8, metalness: 0.4 }),
@@ -91,6 +91,10 @@ export class Humanoid {
       // scavenged armour: random plates, tyre pauldron, bandolier
       if (rnd() < 0.6) add(this.chest, RB(0.26, 0.2, 0.04, 0.01), m.rust, (rnd() - 0.5) * 0.08, 0.1, 0.16, 1, 1, 1, 0, 0, (rnd() - 0.5) * 0.4);
       add(this.chest, new THREE.BoxGeometry(0.06, 0.5, 0.31), m.vest, 0, 0.02, 0, 1, 1, 1, 0, 0, 0.75); // bandolier
+      // faction glow tape: red bars front + back so raiders read against the street at range
+      add(this.chest, new THREE.BoxGeometry(0.3, 0.035, 0.012), m.accent, 0, -0.08, 0.15);
+      add(this.chest, new THREE.BoxGeometry(0.035, 0.26, 0.012), m.accent, 0.09, 0.06, -0.15);
+      add(this.chest, new THREE.BoxGeometry(0.035, 0.26, 0.012), m.accent, -0.09, 0.06, -0.15);
       for (let i = 0; i < 5; i++) add(this.chest, new THREE.CylinderGeometry(0.014, 0.014, 0.06, 5), m.bone, -0.13 + i * 0.065, 0.13 - i * 0.065 * 0.95, 0.17);
       const tyreSide = rnd() < 0.5 ? -1 : 1;
       addR(this.chest, new THREE.TorusGeometry(0.11, 0.05, 6, 12), m.rubber, tyreSide * 0.27, 0.2, 0, Math.PI / 2, 0.3 * tyreSide, 0);
@@ -115,6 +119,7 @@ export class Humanoid {
       for (let i = 0; i < 7; i++) add(this.chest, new THREE.SphereGeometry(0.035 + (i % 3) * 0.02, 8, 6), i % 3 === 0 ? m.accent : m.skin, (rnd() - 0.5) * 0.3, rnd() * 0.3 - 0.05, -0.1 - rnd() * 0.06);
       for (let i = 0; i < 4; i++) addR(this.chest, new THREE.TorusGeometry(0.15, 0.012, 4, 10, Math.PI), m.bone, 0, 0.08 - i * 0.06, 0.03, 0, 0, Math.PI);
       add(this.chest, capsule(0.1, 0.14), m.skin, 0, 0.2, 0.0, 2.4, 1, 1.1, 0, 0, Math.PI / 2); // traps
+      for (let i = 0; i < 4; i++) add(this.chest, new THREE.SphereGeometry(0.04, 6, 5), m.accent, (i - 1.5) * 0.09, 0.22 - (i % 2) * 0.12, -0.15); // glowing back boils
       add(this.hips, new THREE.BoxGeometry(0.36, 0.16, 0.24), m.cloth, 0, -0.08, 0); // torn shorts
       for (let i = 0; i < 4; i++) add(this.hips, new THREE.BoxGeometry(0.08, 0.2, 0.01), m.cloth, -0.13 + i * 0.09, -0.18, 0.125);
     } else { // brute
@@ -166,7 +171,8 @@ export class Humanoid {
     } else {
       add(this.head, new THREE.SphereGeometry(0.12, 12, 8), m.skin, 0, 0, 0, 1.1, 1, 1.05);
       add(this.head, RB(0.27, 0.24, 0.27, 0.05), m.plate, 0, 0.02, 0); // welded helmet
-      add(this.head, new THREE.BoxGeometry(0.2, 0.025, 0.02), m.eye, 0, 0.03, 0.137); // visor slit
+      add(this.head, new THREE.BoxGeometry(0.22, 0.04, 0.02), m.eye, 0, 0.03, 0.137); // visor slit
+      for (const sx of [-1, 1]) add(this.chest, new THREE.BoxGeometry(0.04, 0.3, 0.012), m.accent, sx * 0.2, 0.04, 0.235); // furnace vents
       add(this.head, new THREE.BoxGeometry(0.04, 0.12, 0.3), m.rust, 0, 0.16, 0); // crest
     }
     // arms
@@ -287,7 +293,7 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
   }
   // opts: { push, gib, headshot, kind }
   die(dirX, dirZ, opts = {}) {
-    this.deathT = 0; this.flash = 0.75;
+    this.deathT = 0; this.flash = 1;
     const l = Math.hypot(dirX, dirZ) || 1; dirX /= l; dirZ /= l;
     this.deathHit = { x: dirX, z: dirZ };
     const push = opts.push ?? 2.5;
@@ -327,9 +333,9 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
 
   // s: { speed, moveX, moveZ (world move dir), rolling, rollP (0..1), reloading, reloadP, pump, crouch, sprint }
   update(dt, s) {
-    this.flash = Math.max(0, this.flash - dt * 10);
+    this.flash = Math.max(0, this.flash - dt * 14);
     const fl = this.flash * this.flash;
-    for (const mt of this.allMats) mt.emissive.setRGB(fl * 0.45, fl * 0.12, fl * 0.08);
+    for (const mt of this.allMats) mt.emissive.setRGB(fl * 1.5, fl * 1.4, fl * 1.3); // white hit flash
     // damped spring flinch (overshoots a little = reads as impact)
     this.flinchV.addScaledVector(this.flinch, -160 * dt).multiplyScalar(Math.exp(-14 * dt));
     this.flinch.addScaledVector(this.flinchV, dt);
@@ -459,7 +465,7 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
   updateDeath(dt) {
     this.deathT += dt;
     const T0 = this.deathT, mode = this.deathMode;
-    this.uDissolve.value = T0 > 5.2 && this.kind !== 'player' ? Math.min(1.05, (T0 - 5.2) / 2.6) : 0;
+    this.uDissolve.value = T0 > 3.4 && this.kind !== 'player' ? Math.min(1.05, (T0 - 3.4) / 2.2) : 0;
     this.dissolve = this.uDissolve.value;
     if (mode === 'gib') return;
     // yaw toward the fall direction (fast), plus spin variant
