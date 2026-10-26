@@ -80,6 +80,8 @@ export class Environment {
     for (const b of layout.buildings) this.buildBuilding(b);
     for (const p of layout.props) this.buildProp(p);
     for (const line of layout.poles) this.buildPoles(line);
+    if (layout.landmark && layout.landmark.kind === 'overpass') this.buildOverpass(layout.landmark);
+    if (layout.landmark && layout.landmark.kind === 'craterPlaza') this.buildCraterPlaza(layout.landmark);
     this.buildCables();
     for (const rb of layout.roadblocks || []) this.buildRoadblock(rb);
     const main = this.batch; this.batch = new GeoBatch();
@@ -602,6 +604,13 @@ export class Environment {
         if (rng.chance(0.5)) { const g = rockGeo(rng.int(1, 999), 1); const k = rng.range(0.6, 1.1); g.scale(k, k * 0.4, k); g.translate(p.x, -0.05, p.z); boxUV(g, 0.4); this.batch.add(M.rubble, g); }
         break;
       }
+      case 'gasStation': this.buildGasStation(p, rng); break;
+      case 'planterBed': {
+        const y = this.heightAt(p.x, p.z);
+        this.place(K.planterBedParts(rng, p.len, this.L.foliage), p.x, y, p.z, rot);
+        col.add(p.x, p.z, p.len / 2, 0.65, rot, 0.8, { kind: 'cover' });
+        break;
+      }
       case 'crater': {
         const s2 = p.s || 2;
         this.decals.push({ kind: 'scorch', x: p.x, z: p.z, s: s2 * 2.6, rot: rng.range(0, 6) });
@@ -618,7 +627,7 @@ export class Environment {
         const y = this.heightAt(p.x, p.z);
         this.addBox(M.trim, p.x, y + 0.04, p.z, 1.3, 0.1, 1.3, 0, 0x8a8680, 0.5);
         this.place(P.deadTreeParts(rng, p.s || 1, !p.dead), p.x, y, p.z, rng.range(0, 6));
-        if (rng.chance(0.6)) this.place(P.bushParts(rng, 0.6), p.x, y, p.z, 0);
+        if (rng.chance(0.6)) this.place(P.bushParts(rng, 0.6, this.L.foliage), p.x, y, p.z, 0);
         col.add(p.x, p.z, 0.2, 0.2, 0, 4, { kind: 'tree' }); break;
       }
       case 'jersey': this.place(P.jerseyParts(p.len || 2.6), p.x, 0, p.z, rot); col.add(p.x, p.z, (p.len || 2.6) / 2, 0.32, rot, 0.85, { kind: 'cover' }); break;
@@ -672,7 +681,7 @@ export class Environment {
         col.add(p.x, p.z, 0.2 * p.s, 0.2 * p.s, 0, 4, { kind: 'tree' });
         break;
       }
-      case 'bush': this.place(P.bushParts(rng, p.s || 1), p.x, 0, p.z, rng.range(0, 6)); break;
+      case 'bush': this.place(P.bushParts(rng, p.s || 1, rng.chance(0.6) ? this.L.foliage : null), p.x, this.heightAt(p.x, p.z), p.z, rng.range(0, 6)); break;
       case 'fire':
         if (p.debris) { // burning debris heap on the road
           for (let i = 0; i < 6; i++) this.debris.add(p.x + rng.range(-0.6, 0.6), 0.1, p.z + rng.range(-0.6, 0.6), 1, rng.range(-0.4, 0.4), rng.range(0, 6), rng.range(-0.3, 0.3), 0x1a1410);
@@ -758,6 +767,153 @@ export class Environment {
         this.batch.add(M.black, tg);
       }
     }
+  }
+
+  // ---- hero landmarks -----------------------------------------------------------------------
+  buildGasStation(p, rng) {
+    const M = this.M, col = this.col, alongX = p.w >= p.d;
+    const W = Math.min((alongX ? p.w : p.d) - 5, 15), D = Math.min((alongX ? p.d : p.w) - 7, 9), H = 4.6;
+    const ry = alongX ? 0 : Math.PI / 2, c = Math.cos(ry), sn = Math.sin(ry);
+    const wp = (lx, lz) => [p.x + lx * c + lz * sn, p.z - lx * sn + lz * c];
+    const parts = [];
+    const T = (g, col2) => colorize(g.toNonIndexed(), col2);
+    parts.push({ mat: M.kitMetal, geo: T(K.box(W, 0.45, D, 0, H + 0.25, 0), 0x8a8a86) });
+    parts.push({ mat: M.paint, geo: T(K.box(W + 0.12, 0.42, D + 0.12, 0, H + 0.62, 0), 0xa8231a) });
+    for (const sd of [-1, 1]) { parts.push({ mat: M.paint, geo: T(K.box(W + 0.14, 0.12, 0.14, 0, H + 0.89, sd * (D / 2 + 0.03)), 0xd8d4c8) }); parts.push({ mat: M.paint, geo: T(K.box(0.14, 0.12, D + 0.14, sd * (W / 2 + 0.03), H + 0.89, 0), 0xd8d4c8) }); }
+    { const rg = T(K.box(W, 0.06, D, 0, H + 0.86, 0), 0xffffff); boxUV(rg, 0.3); parts.push({ mat: M.roof, geo: rg }); }
+    for (let x = -W / 2 + 1.2; x < W / 2 - 0.8; x += 2.2) for (let z = -D / 2 + 1.2; z < D / 2 - 0.8; z += 2.4) {
+      const dead = rng.chance(0.18);
+      parts.push({ mat: dead ? M.frame : M.windowLit, geo: T(K.box(1.1, 0.06, 0.5, x, H - 0.0, z), dead ? 0xffffff : new THREE.Color(0xdff0ff).multiplyScalar(1.4)) });
+    }
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      parts.push({ mat: M.paint, geo: T(K.box(0.5, H, 0.5, sx * (W / 2 - 1.2), H / 2, sz * (D / 2 - 1.5)), 0xb8b4aa) });
+      parts.push({ mat: M.paint, geo: T(K.box(0.56, 0.6, 0.56, sx * (W / 2 - 1.2), 0.3, sz * (D / 2 - 1.5)), 0xa8231a) });
+      const [x, z] = wp(sx * (W / 2 - 1.2), sz * (D / 2 - 1.5)); col.add(x, z, 0.28, 0.28, 0, H, { kind: 'pole' });
+    }
+    // pump islands
+    for (const iz of [-D / 4, D / 4]) {
+      parts.push({ mat: M.trim, geo: T(K.box(W * 0.55, 0.2, 1.1, 0, 0.1, iz), 0x9a968e) });
+      for (const ix of [-W * 0.14, W * 0.14]) {
+        parts.push({ mat: M.paint, geo: T(K.box(0.75, 1.65, 0.55, ix, 1.0, iz), rng.chance(0.3) ? 0x6a6a64 : 0xc8c4b8) });
+        parts.push({ mat: M.paint, geo: T(K.box(0.78, 0.3, 0.58, ix, 1.7, iz), 0xa8231a) });
+        for (const s2 of [-1, 1]) parts.push({ mat: M.windowLit, geo: T(K.box(0.4, 0.22, 0.02, ix, 1.35, iz + s2 * 0.285), rng.chance(0.6) ? new THREE.Color(0x40ff80).multiplyScalar(0.6) : 0x000000) });
+        parts.push({ mat: M.black, geo: T(K.cyl(0.03, 0.03, 1.3, 5, ix + 0.45, 0.8, iz, 0, 0, 0.5), 0x111111) });
+        const [x, z] = wp(ix, iz); col.add(x, z, 0.4, 0.32, ry, 1.8, { kind: 'cover' });
+      }
+    }
+    // price pylon with a FUEL neon head
+    const px = W / 2 + 1.6, pz = -D / 2 - 1.2;
+    parts.push({ mat: M.paint, geo: T(K.box(0.35, 7, 0.35, px, 3.5, pz), 0x6a6a64) });
+    this.place(parts, p.x, 0, p.z, ry);
+    // canopy roof junk: AC units, vents, puddles, leaves, a fallen sign board
+    for (let i = 0; i < 5; i++) { const [x, z] = wp(rng.range(-W / 2 + 1, W / 2 - 1), rng.range(-D / 2 + 1, D / 2 - 1)); if (i < 2) this.place(K.acUnitParts(), x, H + 1.2, z, rng.range(0, 6)); else this.place(K.roofVentParts(rng), x, H + 0.89, z, rng.range(0, 6)); }
+    for (let i = 0; i < 6; i++) { const [x, z] = wp(rng.range(-W / 2 + 1, W / 2 - 1), rng.range(-D / 2 + 1, D / 2 - 1)); this.decals.push({ kind: rng.pick(['puddle', 'leaves', 'stain', 'wet', 'paper']), x, z, s: rng.range(1.5, 3.5), rot: rng.range(0, 6), y: H + 0.9 }); }
+    const fuel = SIGN_WORDS.findIndex((w) => w[0] === 'FUEL');
+    const [plx, plz] = wp(px, pz);
+    this.place(K.signParts(fuel, 2.6, 1.3, false, 0.95, false), plx, 7.3, plz, ry);
+    this.place(K.signParts(fuel, 2.6, 1.3, false, 0.95, false), plx, 7.3, plz, ry + Math.PI);
+    col.add(plx, plz, 0.2, 0.2, 0, 7, { kind: 'pole' });
+    const red = new THREE.Color(SIGN_WORDS[fuel][1]);
+    this.signs.push({ pos: new THREE.Vector3(plx, 7.3, plz), color: red, flicker: false, seed: 0.95, landmark: 'gas', word: 'FUEL' });
+    this.lighting.addSource(new THREE.Vector3(plx, 7, plz), red, 30, 12, 'steady', { priority: 1.2 });
+    for (const lx of [-W / 4, W / 4]) { const [x, z] = wp(lx, 0); this.lighting.addSource(new THREE.Vector3(x, H - 0.6, z), 0xd8ecff, 34, 13, rng.chance(0.4) ? 'lamp' : 'steady', { priority: 1.3 }); }
+    this.signs.push({ pos: new THREE.Vector3(...[...wp(0, 0)].flatMap((v, i) => (i ? [H - 0.3, v] : [v]))), color: new THREE.Color(0xd8ecff), flicker: false, landmark: 'gasCanopy' });
+    // kiosk behind the canopy
+    const kz = D / 2 + 2.6, kw = Math.min(W * 0.6, 8), kd = 3.6;
+    const [kx, kzz] = wp(0, kz);
+    if ((alongX ? p.d : p.w) / 2 > kz + kd / 2 + 0.5) {
+      const kp = [];
+      kp.push({ mat: M.plasterWall, geo: T(K.box(kw, 3.2, kd, 0, 1.6, 0), 0xc8c0b0) });
+      kp.push({ mat: M.roof, geo: T(K.box(kw + 0.3, 0.25, kd + 0.3, 0, 3.32, 0), 0xffffff) });
+      kp.push({ mat: M.pane, geo: T(K.box(kw * 0.7, 1.8, 0.05, -0.4, 1.4, -kd / 2 - 0.03), 0xffffff) });
+      kp.push({ mat: M.windowLit, geo: T(K.box(kw * 0.68, 1.7, 0.02, -0.4, 1.4, -kd / 2 + 0.3), new THREE.Color(0xffe0b0).multiplyScalar(0.5)) });
+      kp.push({ mat: M.shutter, geo: T(K.box(1.2, 1.4, 0.06, kw / 2 - 0.9, 1.9, -kd / 2 - 0.04), 0xffffff) });
+      this.place(kp, kx, 0, kzz, ry);
+      this.place(K.signParts(2, 2.4, 1.2, false, 0.6, false), kx + Math.sin(ry) * 0, 3.9, kzz, ry + Math.PI);
+      this.place(K.acUnitParts(), kx, 3.45, kzz, ry);
+      col.add(kx, kzz, alongX ? kw / 2 : kd / 2, alongX ? kd / 2 : kw / 2, 0, 3.3, { kind: 'wall' });
+      this.lighting.addSource(new THREE.Vector3(kx - Math.sin(ry) * 0 , 1.5, kzz - Math.cos(ry) * (kd / 2 + 1)), 0xffd8a0, 10, 7, 'lamp', { priority: 0.9 });
+    }
+    // wrecks at the pumps
+    for (let i = 0; i < 2; i++) { const [x, z] = wp(rng.range(-W / 3, W / 3), i ? D / 4 + 2 : -D / 4 - 2); this.buildProp({ type: 'car', x, z, rot: ry + rng.range(-0.2, 0.2) + (rng.chance(0.5) ? Math.PI : 0), variant: rng.pick([0, 3, 1, 2]), paint: rng.int(0, 8), burnt: rng.chance(0.4), seed: rng.int(1, 1e9) }); }
+  }
+
+  buildOverpass(o) {
+    const M = this.M, rng = new RNG(o.seed), E = HALF + OUTER - 4, top = 7.4, th = 1.1, DW = o.w + 3.2;
+    const at = (a, lat) => (o.axis === 'z' ? [o.c + lat, a] : [a, o.c + lat]);
+    const ry = o.axis === 'z' ? Math.PI / 2 : 0; // local x runs along the overpass
+    const gapA = o.breakAt - 5, gapB = o.breakAt + 6;
+    const deck = (a0, a1) => {
+      const len = a1 - a0, [x, z] = at((a0 + a1) / 2, 0);
+      const parts = [
+        { mat: M.slab, geo: colorize(K.box(len, th, DW, 0, top - th / 2, 0).toNonIndexed(), 0x86827a) },
+        { mat: M.deckTop, geo: colorize(K.box(len, 0.06, DW - 0.9, 0, top + 0.03, 0).toNonIndexed(), 0xffffff) },
+      ];
+      boxUV(parts[1].geo, 1 / 6, [rng.next(), rng.next()]);
+      for (const sd of [-1, 1]) {
+        parts.push({ mat: M.slab, geo: colorize(K.box(len, 0.9, 0.35, 0, top + 0.45, sd * (DW / 2 - 0.18)).toNonIndexed(), 0x9a968e) });
+        parts.push({ mat: M.slab, geo: colorize(K.box(len, 0.25, 0.5, 0, top - th - 0.12, sd * (DW / 2 - 0.6)).toNonIndexed(), 0x7a766e) }); // girders
+      }
+      this.place(parts, x, 0, z, ry);
+      // deck markings + grime (decals carry an explicit height)
+      for (let a = a0 + 2; a < a1 - 2; a += 4.5) { const [dx, dz] = at(a, 0); this.decals.push({ kind: 'dash', x: dx, z: dz, s: 2.2, sx: 0.6, rot: ry - Math.PI / 2, y: top + 0.04 }); }
+      for (let a = a0 + 3; a < a1 - 3; a += rng.range(4, 9)) { const [dx, dz] = at(a, rng.range(-o.w / 2, o.w / 2)); this.decals.push({ kind: rng.pick(['crack', 'oil', 'wet', 'stain', 'paper', 'leaves']), x: dx, z: dz, s: rng.range(2, 4), rot: rng.range(0, 6), y: top + 0.04 }); }
+    };
+    deck(-E, gapA); deck(gapB, E);
+    // collapsed span: one end on the deck lip, the other smashed into the road
+    {
+      const len = Math.hypot(gapB - gapA, top), ang = Math.atan2(top - 0.4, gapB - gapA);
+      const [x, z] = at((gapA + gapB) / 2, rng.range(-0.6, 0.6));
+      this.place([{ mat: M.slab, geo: colorize(K.box(len, th, o.w - 0.4, 0, 0, 0).toNonIndexed(), 0x86827a) }, { mat: M.slab, geo: colorize(K.box(len, 0.9, 0.35, 0, 0.6, (o.w - 0.4) / 2 - 0.2).toNonIndexed(), 0x9a968e) }], x, top / 2 - 0.1, z, ry, 1, 0, o.axis === 'x' ? -ang : ang);
+      const [cx2, cz2] = at(gapA + (gapB - gapA) * 0.7, 0), hl = (gapB - gapA) * 0.3, hw = o.w / 2 - 0.4;
+      this.col.add(cx2, cz2, o.axis === 'x' ? hl : hw, o.axis === 'x' ? hw : hl, 0, 2.6, { kind: 'wall' });
+    }
+    // supports
+    for (let a = -E + 6; a < E - 4; a += 14) {
+      if (a > gapA - 2 && a < gapB + 2) continue;
+      for (const sd of [-1, 1]) {
+        const [x, z] = at(a, sd * (o.w / 2 - 0.7));
+        this.addBox(M.slab, x, (top - th) / 2, z, 0.9, top - th, 0.9, 0, 0x8e8a82, 0.33, 0, 0, 0, true);
+        if (Math.abs(x) < HALF && Math.abs(z) < HALF) this.col.add(x, z, 0.45, 0.45, 0, top, { kind: 'pole' });
+      }
+      const [x, z] = at(a, 0);
+      this.place([{ mat: M.slab, geo: colorize(K.box(1.2, 0.8, DW, 0, top - th - 0.4, 0).toNonIndexed(), 0x86827a) }], x, 0, z, ry);
+      // grime drips + vines hanging off the deck edge
+      if (rng.chance(0.6)) for (const sd of [-1, 1]) { const vg = new THREE.PlaneGeometry(rng.range(2, 5), rng.range(2, 4)); vg.translate(0, -vg.parameters.height / 2, 0); vg.rotateY(ry + (sd > 0 ? 0 : Math.PI)); const [vx, vz] = at(a + rng.range(2, 10), sd * (DW / 2 + 0.03)); vg.translate(vx, top - th + 0.1, vz); this.batch.add(M.vines, vg); }
+    }
+    // stuff up on the deck: wrecks, lamps, debris (seen from the camera, layering the street)
+    for (let a = -E + 8; a < E - 8; a += rng.range(7, 13)) {
+      if (a > gapA - 3 && a < gapB + 3) continue;
+      const k = rng.next(), [x, z] = at(a, rng.range(-o.w / 2 + 1.2, o.w / 2 - 1.2));
+      if (k < 0.4) this.place(P.carParts(rng.weighted([[0, 3], [3, 2], [1, 2], [4, 1], [5, 0.5]]), rng.int(0, 8), rng.chance(0.4)), x, top + 0.05, z, ry + rng.range(-0.3, 0.3) + (rng.chance(0.5) ? Math.PI : 0));
+      else if (k < 0.55) { const [lx, lz] = at(a, (rng.chance(0.5) ? 1 : -1) * (DW / 2 - 0.4)); const w2 = rng.chance(0.4); this.place(P.lampParts(rng.chance(0.3), w2), lx, top, lz, ry + (lz > o.c || lx > o.c ? Math.PI : 0) + Math.PI / 2); if (w2) this.lighting.addSource(new THREE.Vector3(lx, top + 5.8, lz), 0xffa855, 40, 14, 'lamp', { priority: 0.8 }); }
+      else if (k < 0.75) this.place(K.bagPileParts(rng, 5), x, top, z, 0);
+      else this.place(P.jerseyParts(2.6), x, top, z, ry + rng.range(-0.5, 0.5));
+    }
+    // the fallen span's footprint + a rubble mound under it
+    const [bx, bz] = at(o.breakAt + 3.5, 0);
+    for (let i = 0; i < 4; i++) { const g = rockGeo(rng.int(1, 999), 1); const sc = rng.range(1.4, 2.6); g.scale(sc, sc * 0.5, sc); g.translate(bx + rng.range(-4, 4), -0.2, bz + rng.range(-4, 4)); boxUV(g, 0.4); this.batch.add(M.rubble, g); }
+    for (let i = 0; i < 80; i++) this.rubble.add(bx + rng.range(-7, 7), 0.03, bz + rng.range(-7, 7), rng.range(0.1, 0.5), rng.range(0, 3), rng.range(0, 3), 0);
+    for (let i = 0; i < 10; i++) this.rebar.add(bx + rng.range(-4, 4), rng.range(0.3, 3), bz + rng.range(-4, 4), [2, rng.range(1.5, 3), 2], rng.range(-1, 1), 0, rng.range(-1, 1));
+  }
+
+  buildCraterPlaza(o) {
+    const M = this.M, rng = new RNG(o.seed), r = o.r;
+    this.decals.push({ kind: 'scorch', x: o.x, z: o.z, s: r * 2.8, rot: rng.range(0, 6) });
+    this.decals.push({ kind: 'patch', x: o.x, z: o.z, s: r * 1.3, rot: rng.range(0, 6) });
+    this.decals.push({ kind: 'puddle', x: o.x + rng.range(-1, 1), z: o.z + rng.range(-1, 1), s: r * 0.9, rot: rng.range(0, 6) });
+    const n = Math.floor(r * 2.2);
+    for (let i = 0; i < n; i++) { // upturned asphalt slabs leaning outward
+      const a = (i / n) * Math.PI * 2 + rng.range(-0.1, 0.1), rr = r * rng.range(0.88, 1.02), x = o.x + Math.cos(a) * rr, z = o.z + Math.sin(a) * rr;
+      const w = rng.range(1.6, 2.8), tilt = rng.range(0.35, 0.9);
+      this.addBox(M.asphalt, x, 0.25 + tilt * 0.4, z, 0.3, w * 0.7, w, -a, 0xffffff, 1 / 6, 0, tilt, 0);
+      if (rng.chance(0.5) && Math.abs(x) < HALF && Math.abs(z) < HALF) this.col.add(x, z, 0.5, w / 2, -a, 1.0, { kind: 'cover' });
+    }
+    for (let i = 0; i < 120; i++) { const a = rng.range(0, 6.28), rr = r * Math.sqrt(rng.next()) * 1.9; this.rubble.add(o.x + Math.cos(a) * rr, 0.03, o.z + Math.sin(a) * rr, rng.range(0.06, 0.45), rng.range(0, 3), rng.range(0, 3), 0); }
+    for (let i = 0; i < 12; i++) this.rebar.add(o.x + rng.range(-r, r), 0.4, o.z + rng.range(-r, r), [2, rng.range(1, 2.5), 2], rng.range(-1, 1), 0, rng.range(-1, 1));
+    this.buildProp({ type: 'car', x: o.x + rng.range(-2, 2), z: o.z + rng.range(-2, 2), rot: rng.range(0, 6), variant: rng.pick([4, 5, 1]), paint: rng.int(0, 8), burnt: true, flipped: false, seed: rng.int(1, 1e9) });
+    this.addFire(o.x + rng.range(-1.5, 1.5), 0.9, o.z + rng.range(-1.5, 1.5), 1.3);
+    this.smokes.push({ x: o.x, y: 1.5, z: o.z, s: 1.6 });
   }
 
   // sagging cables strung across streets between facade anchors; some carry string lights or rags

@@ -36,6 +36,8 @@ export function generateLayout(seed) {
   const ft = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('theme') : null;
   L.theme = THEMES[ft] ? ft : rng.fork('theme').pick(Object.keys(THEMES));
   const TH = L.themeDef = THEMES[L.theme];
+  // bold mutated foliage palette per seed (the city's overgrowth has turned)
+  L.foliage = rng.fork('fol').weighted([[[0xc01818, 0xe02a20, 0x8a0a10, 0xff4030], 4], [[0xe06010, 0xd04008, 0xf09020, 0xa03008], 2], [[0xa0c020, 0x70a010, 0xc8d030, 0x507a10], 1], [[0xc01870, 0xe03090, 0x801050, 0xff5060], 2]]);
 
   const intervals = (roads) => {
     const iv = []; let a = -HALF - 6;
@@ -66,6 +68,22 @@ export function generateLayout(seed) {
     rng.shuffle(inner).slice(0, 2 - campCount).forEach((b) => (b.type = 'camp'));
   }
 
+  // hero landmark: one per map
+  {
+    const lr = rng.fork('landmark');
+    const hsh = Math.imul((seed >>> 0) ^ 0x5bd1e995, 2654435761) >>> 0;
+    const kind = ['gas', 'overpass', 'craterPlaza', 'gas', 'overpass', 'craterPlaza', 'overpass', 'gas'][(hsh >>> 7) % 8];
+    const inner = L.blocks.filter((b) => !b.edge && b.type !== 'camp' && b.x1 - b.x0 > 17 && b.z1 - b.z0 > 13);
+    if (kind === 'gas' && inner.length) { const b = lr.pick(inner); b.type = 'gas'; L.landmark = { kind, x: (b.x0 + b.x1) / 2, z: (b.z0 + b.z1) / 2 }; }
+    else if (kind === 'overpass' || !inner.length) {
+      const ax = ((hsh >>> 3) & 1) === 1, list = (ax ? rx : rz).filter((r) => Math.abs(r.p) < HALF - 20);
+      const r = list.length ? lr.pick(list) : (ax ? rx : rz)[0];
+      L.landmark = { kind: 'overpass', axis: ax ? 'z' : 'x', c: r.p, w: r.w, breakAt: lr.range(-HALF * 0.5, HALF * 0.5), seed: lr.int(1, 1e9) };
+    } else {
+      const x = lr.pick(rx), z = lr.pick(rz);
+      L.landmark = { kind: 'craterPlaza', x: x.p, z: z.p, r: lr.range(6.5, 8.5), seed: lr.int(1, 1e9) };
+    }
+  }
   for (const b of L.blocks) fillBlock(L, b, rng.fork('b' + b.x0 + ',' + b.z0));
   decorateRoads(L, rng.fork('roads'));
   buildOuterRing(L, rng.fork('outer'));
@@ -160,6 +178,11 @@ function fillBlock(L, b, rng) {
     P.push({ type: 'lightRig', x: cx + rng.range(-3, 3), z: cz + rng.range(-3, 3) });
     L.camps = L.camps || []; L.camps.push({ x: cx, z: cz, r: R });
     L.grassAreas.push({ ...b, density: 0.2 });
+  } else if (b.type === 'gas') { // gas station: canopy + pump islands + kiosk + price pylon (built in environment)
+    L.decals.push({ kind: 'parkinglot', ...b });
+    const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2;
+    P.push({ type: 'gasStation', x: cx, z: cz, w, d, seed: rng.int(1, 1e9) });
+    for (let i = 0; i < 6; i++) L.decals.push({ kind: rng.pick(['oil', 'stain', 'wet']), x: cx + rng.range(-w / 3, w / 3), z: cz + rng.range(-d / 3, d / 3), s: rng.range(2, 4), rot: rng.range(0, 6) });
   } else if (b.type === 'yard') {
     L.decals.push({ kind: 'dirtlot', ...b });
     const n = rng.int(2, 5);
@@ -203,11 +226,19 @@ function decorateRoads(L, rng) {
       for (let a = s.a + 3 + rng.range(0, 3); a < s.b - 4; a += rng.range(5.8, 7.5)) if (rng.chance(0.75)) car(at(s, a, lane + rng.range(-0.3, 0.3)), rotAlong(s) + dir + rng.range(-0.12, 0.12), main);
     }
     if (median) {
-      for (let a = s.a + 2; a < s.b - 2; a += 2.7) { if (rng.chance(0.12)) { a += 2; continue; } P.push({ type: 'jersey', ...at(s, a + 1.3, rng.range(-0.08, 0.08)), rot: rotAlong(s) + Math.PI / 2 + rng.range(-0.05, 0.05), len: 2.6 }); }
+      if (rng.chance(0.5)) { for (let a = s.a + 3; a < s.b - 6; a += rng.range(6, 8)) P.push({ type: 'planterBed', ...at(s, a + 2.4, 0), rot: rotAlong(s), len: 4.6, seed: rng.int(1, 1e9) }); }
+      else for (let a = s.a + 2; a < s.b - 2; a += 2.7) { if (rng.chance(0.12)) { a += 2; continue; } P.push({ type: 'jersey', ...at(s, a + 1.3, rng.range(-0.08, 0.08)), rot: rotAlong(s) + rng.range(-0.05, 0.05), len: 2.6 }); }
     }
     // front-line damage: shell craters (scorch + rubble ring), sandbag nests, tank traps
     if (rng.chance(TH.war * 0.6)) { const p = at(s, rng.range(s.a + 3, s.b - 3), rng.range(-s.w / 2 + 1.5, s.w / 2 - 1.5)); P.push({ type: 'crater', ...p, s: rng.range(1.6, 2.8), seed: rng.int(1, 1e9) }); }
     if (rng.chance(TH.war * 0.25)) { const p = at(s, rng.range(s.a + 3, s.b - 3), rng.range(-s.w / 2 + 2, s.w / 2 - 2)); for (let i = 0; i < 3; i++) P.push({ type: 'hedgehog', x: p.x + rng.range(-2.5, 2.5), z: p.z + rng.range(-2.5, 2.5), rot: rng.range(0, 6.28) }); }
+    // raised planter beds overflowing with saturated growth (mid-size cover clusters)
+    for (const side of [-1, 1]) if (rng.chance(0.55)) for (let a = s.a + rng.range(2, 6); a < s.b - 5; a += rng.range(9, 16)) {
+      if (!rng.chance(0.6)) continue;
+      const len = rng.range(2.6, 4.6);
+      P.push({ type: 'planterBed', ...at(s, a + len / 2, side * (s.w / 2 + 1.2)), rot: rotAlong(s), len, seed: rng.int(1, 1e9) });
+      a += len;
+    }
     // tree pits with dead / overgrown street trees
     if (rng.chance(0.6 * TH.trees)) { const side = rng.sign(); for (let a = s.a + rng.range(3, 7); a < s.b - 3; a += rng.range(8, 13)) if (rng.chance(0.7)) P.push({ type: 'treepit', ...at(s, a, side * (s.w / 2 + 1.25)), s: rng.range(0.7, 1.1), dead: rng.chance(0.6), seed: rng.int(1, 1e9) }); }
     // debris / rubble piles partially blocking road

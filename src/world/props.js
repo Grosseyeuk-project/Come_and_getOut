@@ -82,7 +82,8 @@ export function carParts(variant, paint, burnt) {
     W = 2.3; wheelX = [2.35, -1.6, -2.6]; wheelR = 0.46; front = 3.45; back = -3.75; lightY = 0.9;
     add(body, extrude([[1.3, 0.55], { arc: [2.35, 0.5, 0.56] }, [3.3, 0.55], [3.45, 0.75], [3.42, 1.4], [3.0, 1.6], [2.65, 2.55], [1.3, 2.6]], W - 0.12, 0.06));
     add(glass, extrude([[3.0, 1.55], [2.67, 2.42], [2.3, 2.45], [2.3, 1.6]], W - 0.06, 0.03));
-    add(burnt ? M.carBurnt : M.carPaint[(paint + 2) % PAINTS], box(5.0, 2.9, W + 0.1, -1.25, 2.15, 0));
+    add(burnt ? M.carBurnt : M.container[paint % 4], box(5.0, 2.9, W + 0.1, -1.25, 2.15, 0));
+    for (let i = 0; i < 3; i++) add(M.metal, box(0.6, 0.12, 0.6, -2.8 + i * 1.6, 3.66, (i - 1) * 0.4)); // roof vents
     add(M.black, box(5.6, 0.35, W - 0.3, -0.85, 0.55, 0));
     add(M.metal, box(0.06, 2.8, W + 0.14, -3.76, 2.15, 0));
     add(M.metal, box(5.0, 0.08, W + 0.16, -1.25, 0.72, 0));
@@ -128,12 +129,26 @@ export function carParts(variant, paint, burnt) {
   for (const p of parts) { // metric box-projected UVs so paint/rust/char detail keeps a constant texel scale
     if (p.geo.index) p.geo = p.geo.toNonIndexed();
     if (DET.has(p.mat)) { colorize(p.geo, DET.get(p.mat)); p.mat = M.carDetail; } // one draw call for all small trim
+    else if (p.mat === body || p.mat === M.carBurnt) carGrime(p.geo, variant * 7 + paint);
     boxUV(p.geo, 0.55, [variant * 0.31 + paint * 0.17, paint * 0.23]);
   }
   carCache.set(key, parts.map((p) => ({ mat: p.mat, geo: p.geo })));
   return parts.map((p) => ({ mat: p.mat, geo: p.geo.clone() }));
 }
 // half extents [x, height, z]
+// road grime from the sills up, dusty roof, random dark blotches (vertex colours, multiplies the paint texture)
+function carGrime(g, seed) {
+  const p = g.attributes.position, n = g.attributes.normal, c = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i), x = p.getX(i), z = p.getZ(i);
+    const low = Math.min(1, Math.max(0, (y - 0.25) / 0.75));
+    let k = 0.45 + 0.55 * low * low;
+    if (n && n.getY(i) > 0.7) k *= 0.62 + 0.25 * Math.sin(x * 3.1 + seed) * Math.sin(z * 4.3 + seed * 0.7); // dirty roof/bonnet
+    k *= 0.88 + 0.12 * Math.sin(x * 1.7 + seed * 1.3 + z * 2.1);
+    c[i * 3] = k; c[i * 3 + 1] = k * 0.97; c[i * 3 + 2] = k * 0.92;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+}
 export function carSize(variant) { return [[2.35, 0.92, 0.9], [2.5, 1.0, 1.0], [2.7, 0.95, 0.95], [2.0, 0.9, 0.85], [3.8, 1.5, 1.2], [5.7, 1.6, 1.3]][variant] || [2.35, 0.92, 0.9]; }
 
 // ---------- Barricades ----------
@@ -301,7 +316,7 @@ export function deadTreeParts(rng, s = 1, leaves = false) {
   branch(new V(0, 0, 0), new V(rng.range(-0.1, 0.1), 1, rng.range(-0.1, 0.1)).normalize(), 2.2 * s, 0.16 * s, 3);
   return parts;
 }
-function leafClump(rng, s) {
+export function leafClump(rng, s) {
   const gs = [];
   for (let i = 0; i < 3; i++) { const g = new THREE.PlaneGeometry(1.6 * s, 1.6 * s); g.rotateY((i / 3) * Math.PI + rng.range(0, 0.4)); g.rotateX(rng.range(-0.4, 0.4)); gs.push(g); }
   const pg = new THREE.PlaneGeometry(1.6 * s, 1.6 * s); pg.rotateX(-Math.PI / 2); gs.push(pg);
@@ -310,9 +325,12 @@ function leafClump(rng, s) {
   for (let i = 0; i < n.count; i++) { const x = p.getX(i), y = p.getY(i) + 0.6 * s, z = p.getZ(i), l = Math.hypot(x, y, z) || 1; n.setXYZ(i, x / l, y / l, z / l); }
   return merged;
 }
-export function bushParts(rng, s = 1) {
+export function bushParts(rng, s = 1, colors = null) {
   const M = materials(); const parts = [];
-  for (let i = 0; i < rng.int(2, 4); i++) { const g = leafClump(rng, s * rng.range(0.6, 1)); g.translate(rng.range(-0.5, 0.5) * s, 0.45 * s + rng.range(0, 0.3), rng.range(-0.5, 0.5) * s); parts.push({ mat: M.leaves, geo: g }); }
+  for (let i = 0; i < rng.int(2, 4); i++) {
+    const g = leafClump(rng, s * rng.range(0.6, 1)); g.translate(rng.range(-0.5, 0.5) * s, 0.45 * s + rng.range(0, 0.3), rng.range(-0.5, 0.5) * s);
+    if (colors) { colorize(g, new THREE.Color(rng.pick(colors)).multiplyScalar(rng.range(0.7, 1.15))); parts.push({ mat: M.foliage, geo: g }); } else parts.push({ mat: M.leaves, geo: g });
+  }
   return parts;
 }
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';

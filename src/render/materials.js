@@ -155,10 +155,10 @@ export function materials() {
   M.containerCorr = M.container;
   // vehicle paints: dielectric paint with scratches/rust (metalness only in scratches); last = burnt
   M.carPaint = [
-    ['red', [0.32, 0.05, 0.04]], ['navy', [0.07, 0.11, 0.18]], ['white', [0.55, 0.55, 0.52]], ['olive', [0.16, 0.18, 0.11]],
-    ['beige', [0.42, 0.35, 0.22]], ['silver', [0.33, 0.34, 0.35]], ['taxi', [0.6, 0.42, 0.06]], ['black', [0.03, 0.03, 0.035]], ['teal', [0.06, 0.2, 0.2]],
-  ].map(([k, c]) => std(T.carPaint(k, c), { metal: true, normalScale: 0.4, extra: { envMapIntensity: 1.6 } }));
-  M.carBurnt = std(T.burntMetal(), { metal: true, normalScale: 1.2 });
+    ['red', [0.32, 0.05, 0.04]], ['navy', [0.07, 0.11, 0.18]], ['white', [0.4, 0.4, 0.38]], ['olive', [0.16, 0.18, 0.11]],
+    ['beige', [0.42, 0.35, 0.22]], ['silver', [0.33, 0.34, 0.35]], ['taxi', [0.5, 0.34, 0.04]], ['black', [0.03, 0.03, 0.035]], ['teal', [0.06, 0.2, 0.2]],
+  ].map(([k, c]) => std(T.carPaint(k, c), { metal: true, normalScale: 0.7, extra: { envMapIntensity: 1.6, vertexColors: true } }));
+  M.carBurnt = std(T.burntMetal(), { metal: true, normalScale: 1.2, extra: { vertexColors: true } });
   M.carPaint.push(M.carBurnt); // legacy index 'burnt'
   M.carGlass = new THREE.MeshStandardMaterial({ color: 0x0c1014, roughness: 0.06, metalness: 0.2, envMapIntensity: 2.5 });
   M.headlight = new THREE.MeshStandardMaterial({ color: 0x9a9890, roughness: 0.15, metalness: 0.5, emissive: 0x302a20, emissiveIntensity: 0.6 });
@@ -189,6 +189,7 @@ export function materials() {
     const f = T.facade(st);
     M['facade_' + st] = applyCutout(std(f, { normalScale: 0.8, extra: { vertexColors: true, emissiveMap: f.emissiveMap, emissive: 0xffffff, emissiveIntensity: 3.2 } }));
   }
+  M.deckTop = wet(applyCutout(std(T.asphalt(), { normalScale: 1.0, extra: { vertexColors: true, envMapIntensity: 1.5 } })), 0.06, 0.9);
   M.roof = applyCutout(std(T.roofing(), { normalScale: 0.8, extra: { vertexColors: true } }));
   M.shutter = applyCutout(std(T.shutter(), { metal: true, extra: { vertexColors: true } }));
   M.frame = applyCutout(new THREE.MeshStandardMaterial({ color: 0x1c1c1e, roughness: 0.55, metalness: 0.6, vertexColors: true }));
@@ -208,7 +209,9 @@ export function materials() {
   // --- street clutter ---
   M.plastic = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.38, vertexColors: true, envMapIntensity: 1.4 });
   M.paint = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, metalness: 0.3, vertexColors: true });
-  M.cardboard = std(T.fabric(), { extra: { color: 0x7a5a38 } });
+  M.cardboard = std(T.cardboard(), { normalScale: 0.8 });
+  M.crate = std(T.crateWood(), { normalScale: 1.0 });
+  M.foliage = foliage(new THREE.MeshStandardMaterial({ map: T.leafBright(), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.75, vertexColors: true }));
   M.paper = new THREE.MeshStandardMaterial({ color: 0xc8c0aa, roughness: 0.9, side: THREE.DoubleSide });
   return M;
 }

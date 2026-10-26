@@ -519,25 +519,79 @@ export function muzzleTex() {
 export function carPaint(key, paint = [0.4, 0.4, 0.4]) {
   const k = 'car_' + key;
   if (cache[k]) return cache[k];
-  const S = 256, rng = new RNG(hashKind(key));
-  const scratches = crackMask(S, rng, 14, 0.6, 18);
+  const S = 512, rng = new RNG(hashKind(key));
+  const scratches = crackMask(S, rng, 34, 0.7, 22);
   cache[k] = genPBR(S, (u, v, x, y, o) => {
     const i = y * S + x;
-    const n = tn(u, v, 2, 3, 201), d = tn(u, v, 8, 4, 202), f = hash2(x, y, 203);
-    const rs = tn(u, v, 5, 4, 204);
-    const rust = clamp((rs - 0.7) * 6, 0, 1);
-    const grime = clamp((d - 0.45) * 1.6, 0, 1) * 0.5;
+    const n = tn(u, v, 2, 3, 201), d = tn(u, v, 6, 4, 202), f = hash2(x, y, 203), dd = tn(u, v, 24, 3, 207);
+    const rs = tn(u, v, 4, 4, 204), peel = tn(u, v, 5, 4, 205);
+    const streak = vnoise(u * 70, v * 2.5, 206, 70) * (0.5 + 0.5 * tn(u, v, 3, 2, 208));
+    const rust = clamp((rs - 0.62) * 5 + streak * 0.3, 0, 1);
+    const grime = clamp((d - 0.38) * 1.5 + streak * 0.5 + (dd - 0.5) * 0.4, 0, 1) * 0.75;
+    const matte = peel > 0.6 && peel < 0.68 ? 1 : 0; // clear-coat failure ring
+    const primer = peel > 0.68 ? 1 : 0;           // paint gone: grey primer
     const s = scratches[i];
-    const tone = 0.92 + n * 0.14;
+    const tone = 0.85 + n * 0.25;
     let r = paint[0] * tone, g = paint[1] * tone, b = paint[2] * tone;
-    r = r * (1 - grime) + 0.11 * grime; g = g * (1 - grime) + 0.1 * grime; b = b * (1 - grime) + 0.085 * grime;
-    r += s * 0.18; g += s * 0.18; b += s * 0.18; // bare metal in scratches
-    const rr = 0.2 + f * 0.08, rg = 0.09 + f * 0.04, rb = 0.045;
+    if (primer) { r = 0.16 + n * 0.04; g = 0.16 + n * 0.04; b = 0.155 + n * 0.04; }
+    r = r * (1 - grime) + 0.07 * grime; g = g * (1 - grime) + 0.062 * grime; b = b * (1 - grime) + 0.05 * grime;
+    const dust = f > 0.93 ? 0.05 : 0; r += dust; g += dust; b += dust * 0.9;
+    r += s * 0.16; g += s * 0.16; b += s * 0.16; // bare metal in scratches
+    const rr = 0.17 + f * 0.07 + rs * 0.05, rg = 0.075 + f * 0.03, rb = 0.035;
     o.r = r * (1 - rust) + rr * rust; o.g = g * (1 - rust) + rg * rust; o.b = b * (1 - rust) + rb * rust;
-    o.h = 0.5 + rust * 0.35 * f - s * 0.2; o.ro = 0.32 + grime * 0.5 + rust * 0.55 + s * 0.2 + f * 0.04; o.m = s * 0.8;
-  }, 2.0, { metal: true });
+    o.h = 0.5 + rust * 0.45 * f - s * 0.25 - primer * 0.08 + dd * 0.06; o.ro = 0.28 + grime * 0.55 + matte * 0.3 + primer * 0.5 + rust * 0.55 + s * 0.15 + f * 0.04; o.m = s * 0.8;
+  }, 3.0, { metal: true });
   return cache[k];
 }
+// Wooden crate: plank faces with a border frame, nails, stencil block, grime
+export function crateWood() {
+  if (cache.crate) return cache.crate;
+  const S = 256;
+  cache.crate = genPBR(S, (u, v, x, y, o) => {
+    const frame = u < 0.1 || u > 0.9 || v < 0.1 || v > 0.9, diag = Math.abs(u - v) < 0.06;
+    const pl = Math.floor(v * 5), fv = (v * 5) % 1, id = hash2(pl, 3, 261);
+    const grain = vnoise(u * 3 + id * 9, v * 60, 262) * 0.5 + vnoise(u * 30, v * 4, 263) * 0.5, f = hash2(x, y, 264);
+    const gap = !frame && !diag && fv < 0.05;
+    const sten = !frame && u > 0.3 && u < 0.7 && v > 0.42 && v < 0.58 && ((u * 30 | 0) % 3 !== 0) && hash2(u * 22 | 0, v * 14 | 0, 265) > 0.35;
+    let b = gap ? 0.04 : (frame || diag ? 0.3 : 0.24 + id * 0.08) + grain * 0.1;
+    const dirt = clamp((tn(u, v, 3, 3, 266) - 0.45) * 2, 0, 1) * 0.5;
+    b *= 1 - dirt;
+    o.r = sten ? 0.05 : b * 1.1; o.g = sten ? 0.05 : b * 0.82; o.b = sten ? 0.05 : b * 0.55;
+    if ((frame || diag) && f > 0.995) { o.r = o.g = o.b = 0.35; }
+    o.h = gap ? 0 : (frame || diag ? 0.85 : 0.6) + grain * 0.15; o.ro = 0.85;
+  }, 3.0);
+  return cache.crate;
+}
+export function cardboard() {
+  if (cache.cardboard) return cache.cardboard;
+  const S = 256;
+  cache.cardboard = genPBR(S, (u, v, x, y, o) => {
+    const flute = Math.sin(u * Math.PI * 2 * 40) * 0.5 + 0.5, n = tn(u, v, 4, 4, 271), f = hash2(x, y, 272);
+    const tape = Math.abs(v - 0.5) < 0.07, wet = clamp((tn(u, v, 3, 3, 273) - 0.55) * 3, 0, 1);
+    const print = u > 0.15 && u < 0.45 && v > 0.15 && v < 0.35 && hash2(u * 18 | 0, v * 10 | 0, 274) > 0.5;
+    let r = 0.36 + n * 0.08 + flute * 0.02, g = 0.25 + n * 0.06, b = 0.14 + n * 0.04;
+    if (tape) { r = 0.42; g = 0.36; b = 0.25; }
+    if (print) { r *= 0.3; g *= 0.3; b *= 0.3; }
+    r *= 1 - wet * 0.45; g *= 1 - wet * 0.45; b *= 1 - wet * 0.45;
+    o.r = r + (f - 0.5) * 0.02; o.g = g; o.b = b; o.h = 0.5 + flute * 0.1 - wet * 0.1; o.ro = tape ? 0.4 : 0.92 - wet * 0.3;
+  }, 1.5);
+  return cache.cardboard;
+}
+// Bright, neutral leaf card for vertex-colour tinted foliage masses (saturated reds/oranges/toxic greens)
+export function leafBright() {
+  if (cache.leafB) return cache.leafB;
+  const c = canvas(256), g = c.getContext('2d'), rng = new RNG(133);
+  for (let i = 0; i < 220; i++) {
+    const r2 = Math.sqrt(rng.next()) * 112, a = rng.range(0, 6.3), x = 128 + Math.cos(a) * r2, y = 128 + Math.sin(a) * r2, s = rng.range(5, 13);
+    const l = 120 + rng.int(0, 135) * (1 - r2 / 200);
+    g.fillStyle = `rgb(${l},${l * 0.92 | 0},${l * 0.85 | 0})`;
+    g.save(); g.translate(x, y); g.rotate(rng.range(0, 6.28)); g.beginPath(); g.ellipse(0, 0, s, s * 0.42, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = `rgba(40,30,25,0.5)`; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-s, 0); g.lineTo(s, 0); g.stroke(); g.restore();
+  }
+  cache.leafB = cardTex(c);
+  return cache.leafB;
+}
+
 export function burntMetal() {
   if (cache.burnt) return cache.burnt;
   const S = 256;
@@ -608,7 +662,7 @@ export const SIGN_WORDS = [
   ['MOTEL', '#ff3070'], ['BAR', '#30e0ff'], ['24/7', '#ffd040'], ['PHARMACY', '#40ff80'],
   ['HOTEL', '#ff5030'], ['LIQUOR', '#ff40c0'], ['OPEN', '#ff3030'], ['PAWN', '#ffb020'],
   ['NOODLES', '#ff6040'], ['CLINIC', '#60c0ff'], ['GUNS', '#ff4020'], ['DINER', '#40f0d0'],
-  ['+', '#30ff60'], ['XXX', '#ff30a0'], ['RADIO', '#a070ff'], ['GARAGE', '#ffa030'],
+  ['+', '#30ff60'], ['FUEL', '#ff3040'], ['RADIO', '#a070ff'], ['GARAGE', '#ffa030'],
 ];
 function mixWhite(hex, k) { const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255; return `rgb(${r + (255 - r) * k | 0},${g + (255 - g) * k | 0},${b + (255 - b) * k | 0})`; }
 export function signAtlas() {

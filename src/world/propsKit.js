@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { materials, colorize } from '../render/materials.js';
 import { RNG } from '../core/rng.js';
-import { box, cyl, xf } from './props.js';
+import { box, cyl, xf, leafClump } from './props.js';
 
 const tint = (g, c) => colorize(g.index ? g.toNonIndexed() : g, c);
 
@@ -109,7 +109,7 @@ export function mattressParts(rng) { const M = materials(); return [{ mat: M.san
 export function crateParts(rng) {
   const M = materials(), p = [];
   const n = rng.int(1, 3);
-  for (let i = 0; i < n; i++) { const s = rng.range(0.55, 0.85); p.push({ mat: M.wood, geo: box(s, s, s, (i % 2) * 0.9 - 0.45, s / 2 + (i === 2 ? 0.75 : 0), rng.range(-0.1, 0.1), 0, rng.range(-0.3, 0.3)) }); }
+  for (let i = 0; i < n; i++) { const s = rng.range(0.55, 0.85); p.push({ mat: M.crate, geo: box(s, s, s, (i % 2) * 0.9 - 0.45, s / 2 + (i === 2 ? 0.75 : 0), rng.range(-0.1, 0.1), 0, rng.range(-0.3, 0.3)) }); }
   return p;
 }
 export function tarpParts(rng) {
@@ -212,3 +212,19 @@ export function roofVentParts(rng) {
 }
 export { RNG };
 export { box, cyl };
+
+// Raised concrete planter bed packed with a dense, saturated foliage mass (mutated growth),
+// leaves spilling over the rim. len along x.
+export function planterBedParts(rng, len, colors) {
+  const M = materials(), p = [], w = 1.3, h = rng.range(0.55, 0.85);
+  p.push({ mat: M.trim, geo: tint(box(len, h, w, 0, h / 2, 0), 0x8a8680) });
+  p.push({ mat: M.black, geo: box(len - 0.2, 0.04, w - 0.2, 0, h - 0.02, 0) });
+  for (const sz of [-1, 1]) p.push({ mat: M.trim, geo: tint(box(len + 0.06, 0.08, 0.16, 0, h + 0.02, sz * (w / 2 - 0.05)), 0x9a968e) });
+  const n = Math.ceil(len * 3.2);
+  for (let i = 0; i < n; i++) {
+    const s = rng.range(0.5, 0.95), g = leafClump(rng, s);
+    g.translate(rng.range(-len / 2 + 0.2, len / 2 - 0.2), h + 0.1 + rng.range(0, 0.45), rng.range(-w / 2, w / 2) * 1.1);
+    p.push({ mat: M.foliage, geo: tint(g, new THREE.Color(rng.pick(colors)).multiplyScalar(rng.range(0.6, 1.2))) });
+  }
+  return p;
+}
