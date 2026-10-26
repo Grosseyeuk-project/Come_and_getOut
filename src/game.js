@@ -182,7 +182,7 @@ export class Game {
     cutUniforms.uCutPos.value.set(pl.pos.x, 1.2, pl.pos.z);
     this.audio.setListener(pl.pos.x, pl.pos.z);
     let nf = Infinity; for (const f of this.fx.fires) nf = Math.min(nf, Math.hypot(f.x - pl.pos.x, f.z - pl.pos.z));
-    this.audio.update(dt, nf);
+    this.audio.update(dt, nf, this);
     if (this.mode !== 'title') this.hud.update(dt);
     // grading feedback
     this.hurtFlash = Math.max(0, this.hurtFlash - dt * 1.5);

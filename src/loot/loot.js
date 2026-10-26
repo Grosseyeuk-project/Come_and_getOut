@@ -155,11 +155,11 @@ export class LootManager {
   land(d, quiet = false) {
     d.landed = true; const g = this.game, tier = RARITY[d.item.rarity].tier;
     if (d.item.kind !== 'weapon' || quiet) return;
+    if (tier < 4) g.audio.play('drop', d, { tier, minGap: 0.04 });
     if (tier >= 3) {
       this.bursts.spawn(d.x, 0, d.z, d.col, tier === 4 ? 1.25 : 0.75);
       if (d.light) d.light.intensity = tier === 4 ? 40 : 22, d.flashT = 1;
       if (tier === 4) { g.audio.play('legendary'); g.renderer.addTrauma(0.18); if (g.hud.lootCallout) g.hud.lootCallout(d.item); }
-      else g.audio.play('pickup', null, { tier: 2, vol: 0.6 });
     }
   }
 

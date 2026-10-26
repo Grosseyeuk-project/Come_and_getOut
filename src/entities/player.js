@@ -49,7 +49,7 @@ export class Player {
     const w = this.weapon;
     this.hum.setWeapon(weaponModel(w.base, w.rarity));
     w.cooldown = Math.max(w.cooldown, 0.25);
-    if (!silent) this.game.audio.play('reloadEnd', this.pos, { vol: 0.6 });
+    if (!silent) this.game.audio.play('equip', this.pos, { vol: 0.8 });
     this.game.hud && this.game.hud.dirty();
   }
   muzzleWorld() {
@@ -130,7 +130,7 @@ export class Player {
     w.cooldown -= dt;
     if (w.pumpT > 0) { // shotgun pump: rack + eject the spent shell
       const prev = w.pumpT; w.pumpT -= dt;
-      if (prev > 0.14 && w.pumpT <= 0.14) { const m = this.muzzleWorld(), fx = Math.sin(this.face), fz = Math.cos(this.face); g.fx.casing(m.x - fx * 0.5, m.y, m.z - fz * 0.5, fx, fz, true); g.audio.play('reloadEnd', this.pos, { vol: 0.35 }); }
+      if (prev > 0.14 && w.pumpT <= 0.14) { const m = this.muzzleWorld(), fx = Math.sin(this.face), fz = Math.cos(this.face); g.fx.casing(m.x - fx * 0.5, m.y, m.z - fz * 0.5, fx, fz, true); g.audio.play('pump', this.pos, { vol: 0.7 }); }
     }
     if (w.reloadT > 0 && this.rollT < 0) {
       w.reloadT -= dt;

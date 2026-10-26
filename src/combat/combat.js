@@ -114,10 +114,11 @@ export class Combat {
       const k = wall.box.kind;
       const kind = k === 'car' || k === 'container' || k === 'barrel' || k === 'pole' || k === 'fence' ? 'metal' : k === 'tree' || k === 'tent' ? 'wood' : 'concrete';
       g.fx.impact(x - dx * 0.05, BULLET_Y, z - dz * 0.05, wall.nx, wall.nz, kind, dx, dz, power);
-      if (Math.random() < 0.6) g.audio.play(kind === 'metal' ? 'impactMetal' : 'impact', { x, z }, { minGap: 0.04 });
+      if (Math.random() < 0.6) g.audio.play(kind === 'metal' ? 'impactMetal' : 'impact', { x, z }, { minGap: 0.04, surface: kind });
     } else if (!hit) {
       // bullet lands on the ground at max range: dirt kick-up
       g.fx.impact(x, 0.05, z, -dx * 0.4, -dz * 0.4, 'ground', dx, dz, power * 0.7);
+      if (Math.random() < 0.5) g.audio.play('impact', { x, z }, { minGap: 0.05, surface: 'ground', vol: 0.7 });
       y = 0.1;
     }
     return { hit, kill, x, z, y };
