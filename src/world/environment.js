@@ -71,6 +71,7 @@ export class Environment {
     this.signs = []; // emissive signage {pos, color, flicker, seed, dead}: lighting can pair lights with these
     this.anchors = []; // facade cable anchors
     this.winLights = 0;
+    this.pendingLit = [];
     this.beacons = []; // red rooftop aviation lights (positions) for blinking fx
     this.neon = (layout.themeDef && layout.themeDef.neon) || 1;
     this.emissiveMeshes = []; // filled after batching: meshes whose material is emissive (neon, bulbs, windows)
@@ -196,7 +197,7 @@ export class Environment {
     this.setH(b.x0, b.z0, b.x1, b.z1, 0.12);
     // openings: breaches + doors
     const per = 2 * (w + d);
-    const breaches = []; const nb = b.collapsed ? 2 : b.damage > 0.5 ? rng.int(1, 2) : rng.int(0, 1);
+    const breaches = []; const nb = b.collapsed ? 2 : b.damage > 0.5 ? rng.int(1, 2) : b.damage < 0.05 ? 0 : rng.int(0, 1);
     for (let i = 0; i < nb; i++) breaches.push([rng.range(0, per), rng.range(1.5, 3.5)]);
     let sOff = 0, anyOpening = breaches.length > 0;
     const sideInfo = [];
@@ -290,7 +291,7 @@ export class Environment {
       this.addBox(mat, cx + ix * WT / 2, top / 2, cz + iz * WT / 2, WT + 0.06, top, WT + 0.06, 0, tint, 0.33, 0, 0, 0, true);
       col.add(cx + ix * WT / 2, cz + iz * WT / 2, WT / 2 + 0.03, WT / 2 + 0.03, 0, top);
     }
-    const intact = !b.collapsed && minTop >= H - 0.25;
+    const intact = b.intact = !b.collapsed && minTop >= H - 0.25;
     // upper slabs (partial) + roof on fully intact buildings
     const cell = 3;
     for (let f = 1; f <= b.floors && !b.collapsed; f++) {
@@ -305,6 +306,8 @@ export class Environment {
       }
     }
     if (intact) this.roofKit(b, H, rng);
+    for (const pl of this.pendingLit) if (intact) { this.onWall(pl.S, pl.parts, pl.tc, pl.y0, 0); if (this.winLights++ < 40) this.lighting.addSource(pl.light[0], pl.light[1], 5, 6, pl.light[2], { priority: 0.6 }); }
+    this.pendingLit = [];
     // collapsed slab ramp
     if (b.floors >= 2 && !b.collapsed && rng.chance(b.damage * 0.8) && w > 7 && d > 7) {
       const along = rng.chance(0.5), len = 5.5, ang = Math.asin(Math.min(0.95, FH / len));
@@ -380,9 +383,10 @@ export class Environment {
       for (let i = 0; i < rng.int(2, 4); i++) P.push({ mat: M.wood, geo: K.box(w + 0.2, 0.2, 0.03, 0, rng.range(0.2, h - 0.2), 0.03, 0, 0, rng.range(-0.25, 0.25)) });
     }
     if (!shopFront && st >= 0.62 && rng.chance(0.22)) { // someone still lives here: warm/cold lit interior behind the frame
-      const col = rng.pick([0xffa050, 0xff9040, 0xffc080, 0x80b0ff, 0xff6040]);
-      P.push({ mat: M.windowLit, geo: colorize(K.box(w, h, 0.02, 0, h / 2, -WT - 0.35).toNonIndexed(), new THREE.Color(col).multiplyScalar(rng.range(0.5, 1))) });
-      if (this.winLights++ < 40) this.lighting.addSource(new THREE.Vector3(S.ax + S.ux * tc + S.nx * 0.8, y0 + h / 2, S.az + S.uz * tc + S.nz * 0.8), col, 5, 6, rng.chance(0.3) ? 'lamp' : 'steady', { priority: 0.6 });
+      const col = rng.pick([0xffa050, 0xff9040, 0xffc080, 0xffd8a0, 0x90b8ff, 0xff6040]);
+      // deferred: only kept if the building ends up roofed (a glowing panel inside an open ruin reads wrong from above)
+      this.pendingLit.push({ S, tc, y0, parts: [{ mat: M.windowLit, geo: colorize(K.box(w, h, 0.02, 0, h / 2, -WT - 0.35).toNonIndexed(), new THREE.Color(col).multiplyScalar(rng.range(0.5, 1))) }],
+        light: [new THREE.Vector3(S.ax + S.ux * tc + S.nx * 0.8, y0 + h / 2, S.az + S.uz * tc + S.nz * 0.8), col, rng.chance(0.3) ? 'lamp' : 'steady'] });
     }
     this.onWall(S, P, tc, y0, 0);
     if (shopFront && rng.chance(0.5)) { // dark interior shelf silhouettes
@@ -835,6 +839,23 @@ export class Environment {
   // big neon billboards facing the play area.
   buildOuter() {
     const M = this.M, L = this.L;
+    // dress the streets beyond the border (visual only: no colliders, player can't get there)
+    {
+      const rng = new RNG(L.seed ^ 0x0e7e), E = HALF + OUTER;
+      const lines = [...L.roads.map((r) => ({ axis: r.axis, c: r.axis === 'z' ? r.x : r.z, w: r.w })), ...(L.outerRoads || []).map((r) => ({ axis: r.axis, c: r.axis === 'z' ? r.x : r.z, w: r.w }))];
+      for (const r of lines) for (let a = -E + 4; a < E - 4; a += rng.range(6, 11)) {
+        const lat = rng.range(-r.w / 2 + 1.2, r.w / 2 - 1.2);
+        const [x, z] = r.axis === 'z' ? [r.c + lat, a] : [a, r.c + lat];
+        const out = Math.max(Math.abs(x), Math.abs(z));
+        if (out < HALF + 6 || out > HALF + 34) continue;
+        const k = rng.next();
+        if (k < 0.45) this.place(P.carParts(rng.weighted([[0, 4], [3, 3], [1, 2], [4, 1], [5, 0.4]]), rng.int(0, 8), rng.chance(0.45)), x, -0.05, z, (r.axis === 'z' ? Math.PI / 2 : 0) + rng.range(-0.4, 0.4) + (rng.chance(0.5) ? Math.PI : 0));
+        else if (k < 0.65) { const g = rockGeo(rng.int(1, 999), 1); const sc = rng.range(1, 2.4); g.scale(sc, sc * 0.45, sc); g.translate(x, -0.1, z); boxUV(g, 0.4); this.batch.add(M.rubble, g); }
+        else if (k < 0.75) { this.place(P.barrelParts(rng), x, 0, z, 0); if (rng.chance(0.6)) { this.fires.push({ x, y: 0.95, z, s: 0.6 }); this.lighting.addSource(new THREE.Vector3(x, 1.8, z), 0xff7a2a, 24, 10, 'fire', { priority: 0.8 }); } }
+        else if (k < 0.85) { const side = rng.sign(), lx = r.axis === 'z' ? r.c + side * (r.w / 2 + 0.8) : a, lz = r.axis === 'z' ? a : r.c + side * (r.w / 2 + 0.8); const working = rng.chance(0.35); this.place(P.lampParts(rng.chance(0.3), working), lx, 0, lz, (r.axis === 'z' ? 0 : Math.PI / 2) + (side > 0 ? Math.PI : 0) + Math.PI / 2); if (working) this.lighting.addSource(new THREE.Vector3(lx, 5.8, lz), 0xffa855, 50, 15, 'lamp', { priority: 0.7 }); }
+        else this.place(K.bagPileParts(rng, rng.int(4, 9)), x, 0, z, rng.range(0, 6));
+      }
+    }
     for (const o of L.outer || []) {
       const rng = new RNG(o.seed), w = o.x1 - o.x0, d = o.z1 - o.z0;
       if (o.floors < 0) { // low ruin: broken wall stumps on the lot outline, rubble, overgrowth
@@ -855,6 +876,7 @@ export class Environment {
         if (rng.chance(0.6)) this.place(P.deadTreeParts(rng, rng.range(0.8, 1.3), rng.chance(0.3)), cx + rng.range(-w / 3, w / 3), 0, cz + rng.range(-d / 3, d / 3), rng.range(0, 6));
         for (let i = 0; i < 3; i++) this.place(P.bushParts(rng, rng.range(0.7, 1.3)), rng.range(o.x0 + 1, o.x1 - 1), 0, rng.range(o.z0 + 1, o.z1 - 1), 0);
         if (rng.chance(0.3)) this.place(P.carParts(rng.pick([0, 3, 1]), rng.int(0, 8), true), cx + rng.range(-2, 2), -0.1, cz + rng.range(-2, 2), rng.range(0, 6));
+        if (rng.chance(0.45)) { const fx = cx + rng.range(-w / 4, w / 4), fz = cz + rng.range(-d / 4, d / 4); this.place(P.barrelParts(rng), fx, 0, fz, 0); this.fires.push({ x: fx, y: 0.95, z: fz, s: 0.6 }); this.lighting.addSource(new THREE.Vector3(fx, 1.8, fz), 0xff7a2a, 26, 10, 'fire', { priority: 0.8 }); }
         continue;
       }
       if (o.floors === 0) { // empty lot: rubble mound + dead trees + fence

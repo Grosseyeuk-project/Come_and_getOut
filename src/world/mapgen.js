@@ -105,7 +105,7 @@ function fillBlock(L, b, rng) {
           floors: b.edge ? (f.x1 > HALF - 4 || f.z1 > HALF - 4 ? rng.int(1, 2) : rng.int(3, 6)) : rng.weighted(L.themeDef.floors), // camera-side edge stays low
           style: rng.weighted(L.themeDef.styles),
           tint: rng.pick([0xffffff, 0xf0e6d8, 0xd8dcd8, 0xe8d0c0, 0xc8c0b0, 0xdcd4bc, 0xbfc8cc]),
-          damage: b.type === 'collapsed' ? 1 : rng.range(0.15, 0.85),
+          damage: b.type === 'collapsed' ? 1 : rng.chance(0.32) ? 0 : rng.range(0.15, 0.85), // 0 = intact, roofed
           collapsed: b.type === 'collapsed',
           edge: b.edge,
           seed: rng.int(1, 1e9),
