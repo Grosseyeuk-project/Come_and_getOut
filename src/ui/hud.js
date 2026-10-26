@@ -179,7 +179,7 @@ export class HUD {
       $('mk').textContent = p.medkits; $('sv').textContent = p.scrap;
       const R = RARITY[w.rarity];
       $('weapon').style.setProperty('--rc', R.color);
-      $('wname').textContent = w.name; $('wtype').textContent = `${R.name} ${B.short} · ${dps(w)} DPS`;
+      $('wname').textContent = w.name; $('wtype').textContent = `${B.short} · ${dps(w)} DPS`;
       $('wicon').src = itemIcon(w, 132, 50);
       $('atype').textContent = AMMO_NAME[B.ammo];
       const mp = $('magpips'); mp.innerHTML = ''; mp.className = w.stats.mag > 24 ? 'dense' : '';
@@ -252,10 +252,10 @@ export class HUD {
   updateLoot() {
     const g = this.game, p = g.player, f = g.loot.focus, playing = g.mode === 'playing' && !this.inventoryOpen;
     const ps = this.project(p.pos.x, 1.0, p.pos.z);
-    const seen = new Set(), placed = [];
+    const seen = new Set(), placed = [{ x0: ps.x - 34, x1: ps.x + 34, y0: ps.y - 70, y1: ps.y + 34 }];
     const drops = playing ? g.loot.drops.filter((d) => d.t >= 1 && Math.hypot(d.x - p.pos.x, d.z - p.pos.z) < (d.item.kind === 'weapon' ? 15 : 7)) : [];
     const items = [];
-    for (const d of drops) { const s = this.project(d.x, 0.25, d.z); if (s.vis) items.push({ d, s }); }
+    for (const d of drops) { if (d === f) continue; const s = this.project(d.x, 0.5, d.z); if (s.vis) items.push({ d, s }); }
     items.sort((a, b) => b.s.y - a.s.y);
     for (const { d, s } of items) {
       seen.add(d);
@@ -267,8 +267,9 @@ export class HUD {
         $('lootlabels').appendChild(el); l = { el, w: 0 }; this.labels.set(d, l);
       }
       if (!l.w) l.w = l.el.offsetWidth || 120;
-      const h = 22; let y = s.y - 30; const x0 = s.x - l.w / 2;
+      const h = 22; let y = s.y - 44; const x0 = s.x - l.w / 2;
       for (let it = 0; it < 8; it++) { const hit = placed.find((r) => x0 < r.x1 && x0 + l.w > r.x0 && y < r.y1 && y + h > r.y0); if (!hit) break; y = hit.y0 - h - 2; }
+      if (y > s.y - 26) y = s.y - 44;
       placed.push({ x0, x1: x0 + l.w, y0: y, y1: y + h });
       l.el.style.transform = `translate(${x0 | 0}px,${y | 0}px)`;
       l.el.classList.toggle('focus', d === f);

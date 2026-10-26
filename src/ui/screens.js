@@ -115,10 +115,11 @@ export class Screens {
     p.god = true;
     const items = [...p.weapons, ...p.backpack], total = items.reduce((s, it) => s + (it ? it.value || 0 : 0), 0) + p.scrap;
     $('whaul').innerHTML = this.haul(items, 2.6);
-    $('wstats').innerHTML = this.statGrid();
+    $('wstats').innerHTML = this.statGrid([['Items', items.filter(Boolean).length]]);
     this.countTo = total; this.countT = 0; $('wval').textContent = '0';
     if (this.ship) this.ship.dispose();
-    this.ship = new Dropship(g.scene, g.extraction.x, g.extraction.z);
+    const cam = g.renderer.camera.position, ex = g.extraction, dl = Math.hypot(ex.x - cam.x, ex.z - cam.z) || 1;
+    this.ship = new Dropship(g.scene, p.pos.x, p.pos.z, { x: (ex.x - cam.x) / dl, z: (ex.z - cam.z) / dl });
   }
   update(dt) {
     const g = this.game;

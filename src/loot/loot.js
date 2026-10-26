@@ -6,6 +6,15 @@ import { RARITIES, RARITY, rollWeapon, makeConsumable, weaponModel, dps, BASES }
 import { materials } from '../render/materials.js';
 import { glowTex, runeRingTex, shaftTex, moteTex, additive, LootBursts } from './lootfx.js';
 
+// normal-extruded copy of a weapon part geometry (rendered back-faced = outline), cached per source geometry
+const hullCache = new WeakMap();
+function hullGeo(src) {
+  let h = hullCache.get(src); if (h) return h;
+  h = src.clone(); const p = h.attributes.position, n = h.attributes.normal;
+  for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) + n.getX(i) * 0.012, p.getY(i) + n.getY(i) * 0.012, p.getZ(i) + n.getZ(i) * 0.012);
+  hullCache.set(src, h); return h;
+}
+
 const TIER_RARITY = [
   [['common', 60], ['uncommon', 28], ['rare', 10], ['epic', 2], ['legendary', 0.3]],
   [['common', 30], ['uncommon', 38], ['rare', 22], ['epic', 8], ['legendary', 1.5]],
@@ -19,12 +28,13 @@ export class LootManager {
     this.rng = new RNG(game.seed ^ 0x1007);
     this.planeGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     this.shaftGeo = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);
-    this.glowMats = {}; this.ringMats = {}; this.shaftMats = {}; this.moteMats = {};
+    this.glowMats = {}; this.ringMats = {}; this.rimMats = {}; this.shaftMats = {}; this.moteMats = {};
     for (const r of RARITIES) {
       const c = new THREE.Color(r.hex), t = RARITY[r.key].tier;
-      this.glowMats[r.key] = additive(glowTex(), c.clone().multiplyScalar(0.55 + t * 0.22));
+      this.glowMats[r.key] = additive(glowTex(), c.clone().multiplyScalar(0.8 + t * 0.3));
       this.ringMats[r.key] = additive(runeRingTex(), c.clone().multiplyScalar(1.3 + t * 0.25));
-      this.shaftMats[r.key] = additive(shaftTex(), c.clone().multiplyScalar(0.55 + t * 0.2), { side: THREE.DoubleSide });
+      this.shaftMats[r.key] = additive(shaftTex(), c.clone().multiplyScalar(0.9 + t * 0.35), { side: THREE.DoubleSide });
+      this.rimMats[r.key] = new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(1.4 + t * 0.4), side: THREE.BackSide, fog: false });
       this.moteMats[r.key] = new THREE.PointsMaterial({ map: moteTex(), color: c.clone().multiplyScalar(2.2), size: 0.16, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
     }
     this.collecting = []; this.bursts = new LootBursts(game.scene);
@@ -87,7 +97,7 @@ export class LootManager {
     const col = new THREE.Color(R.hex);
     const grp = new THREE.Group();
     const holder = new THREE.Group(); grp.add(holder);
-    let model;
+    let model, d0rim = null;
     if (weapon) { model = weaponModel(item.base, item.rarity); model.scale.setScalar(1.55); }
     else {
       model = new THREE.Group();
@@ -104,6 +114,11 @@ export class LootManager {
       }
     }
     model.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    if (weapon) { // inverted-hull rarity rim so the silhouette reads on dark asphalt (Diablo-style item outline)
+      const rim = new THREE.Group(); rim.scale.setScalar(1.55);
+      for (const m of model.children) if (m.isMesh) { const o = new THREE.Mesh(hullGeo(m.geometry), this.rimMats[item.rarity]); o.userData.shared = true; rim.add(o); }
+      holder.add(rim); d0rim = rim;
+    }
     holder.add(model);
     // ground presentation: soft light pool + crisp marker ring (rare+), camera-facing soft shaft (rare+), motes (epic+)
     const glowS = weapon ? 1.4 + tier * 0.45 : 0.9;

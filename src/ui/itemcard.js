@@ -12,7 +12,7 @@ const ROWS = [
   ['Magazine', (it) => it.stats.mag, (v) => `${v}`, true],
   ['Reload', (it) => it.stats.reload, (v) => `${v.toFixed(1)}s`, false],
   ['Crit chance', (it) => it.stats.crit, (v) => `${Math.round(v * 100)}%`, true],
-  ['Accuracy', (it) => 1 / (1 + it.stats.spread), (v, it) => `${Math.round(100 - Math.min(90, it.stats.spread * 5))}`, true],
+  ['Accuracy', (it) => Math.round(100 - Math.min(90, it.stats.spread * 5)), (v) => `${v}`, true],
 ];
 
 export function itemType(it) {
