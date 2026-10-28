@@ -15,10 +15,10 @@ const UP_NEG = new V(0, -1, 0);
 const _v1 = new V(), _v2 = new V(), _v3 = new V(), _v4 = new V(), _q = new THREE.Quaternion();
 
 const KINDS = {
-  player: { cloth: 0x4c545c, pants: 0x2c3034, vest: 0x2a2e33, plate: 0x9aa2a8, skin: 0xa07e66, boots: 0x1a1714, gloves: 0x18191a, accent: 0x38d8ff, eye: 0x38d8ff, scale: 1.22, rim: [0.5, 0.85, 1.1] },
-  raider: { cloth: 0x5a2a18, pants: 0x3a3226, vest: 0x2e241c, plate: 0x6a4a2e, skin: 0x8a6a56, boots: 0x1c1712, gloves: 0x2a1d14, accent: 0xff3a14, eye: 0xff2a10, scale: 1.14, rim: [0.75, 0.18, 0.08] },
+  player: { cloth: 0x2e3238, pants: 0x24272b, vest: 0x1c1e22, plate: 0x4a525a, skin: 0xa07e66, boots: 0x1a1714, gloves: 0x18191a, accent: 0x38d8ff, eye: 0x38d8ff, scale: 1.22, rim: [0.22, 0.48, 0.7] },
+  raider: { cloth: 0x5a2a18, pants: 0x3a3226, vest: 0x2e241c, plate: 0x6a4a2e, skin: 0x8a6a56, boots: 0x1c1712, gloves: 0x2a1d14, accent: 0xff3a14, eye: 0xff2a10, scale: 1.14, rim: [0.6, 0.15, 0.06] },
   mutant: { cloth: 0x2e2a22, pants: 0x2b2820, vest: 0x2a2620, plate: 0x3a3a30, skin: 0x8a9478, boots: 0x3b382e, gloves: 0x7a8468, accent: 0xb4ff3a, eye: 0xd4ff30, scale: 1.12, rim: [0.4, 0.75, 0.1] },
-  brute: { cloth: 0x2a221c, pants: 0x2a221c, vest: 0x3a2a20, plate: 0x6a6258, skin: 0x7a6252, boots: 0x2a2018, gloves: 0x3a3430, accent: 0xff6a1a, eye: 0xff8a20, scale: 1.72, rim: [0.85, 0.4, 0.08] },
+  brute: { cloth: 0x2a221c, pants: 0x2a221c, vest: 0x3a2a20, plate: 0x6a6258, skin: 0x7a6252, boots: 0x2a2018, gloves: 0x3a3430, accent: 0xff6a1a, eye: 0xff8a20, scale: 1.72, rim: [0.6, 0.28, 0.06] },
 };
 const RAIDER_CLOTH = [0x5a2a18, 0x6a3a1a, 0x4a3a28, 0x5e4a30, 0x3a2e2a, 0x6a2420];
 
@@ -43,7 +43,7 @@ export class Humanoid {
       bone: new THREE.MeshStandardMaterial({ color: 0xc8bca0, roughness: 0.6 }),
       rust: new THREE.MeshStandardMaterial({ color: 0x5a3a26, roughness: 0.8, metalness: 0.4 }),
       rubber: new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.9 }),
-      cloth2: mk(kind === 'raider' ? RAIDER_CLOTH[Math.floor(rnd() * RAIDER_CLOTH.length)] : K.cloth),
+      cloth2: mk(kind === 'raider' ? RAIDER_CLOTH[Math.floor(rnd() * RAIDER_CLOTH.length)] : kind === 'player' ? 0x8a3a1c : K.cloth),
       flesh: new THREE.MeshStandardMaterial({ color: 0x8a3a30, roughness: 0.4 }),
     };
     const m = this.mats;
@@ -74,18 +74,29 @@ export class Humanoid {
     this.chest = G(this.spine, 0, 0.22, 0);
     const cw = P.chestW;
     if (kind === 'player') {
-      add(this.chest, capsule(0.17, 0.2), m.cloth, 0, 0.02, 0, 1.3, 1, 0.82);
-      add(this.chest, RB(0.42, 0.4, 0.3, 0.05), m.vest, 0, 0.04, 0);
-      add(this.chest, RB(0.34, 0.3, 0.06, 0.02), m.plate, 0, 0.08, 0.16); // front plate
-      add(this.chest, RB(0.3, 0.12, 0.05, 0.02), m.plate, 0, 0.27, 0.06, 1, 1, 1, -0.3); // collar
-      for (let i = 0; i < 3; i++) add(this.chest, RB(0.08, 0.1, 0.05, 0.015, 1), m.vest, -0.1 + i * 0.1, -0.1, 0.18);
-      add(this.chest, RB(0.36, 0.44, 0.2, 0.05), m.plate, 0, 0.04, -0.25); // armoured pack
-      add(this.chest, RB(0.24, 0.3, 0.06, 0.02), m.vest, 0, 0.02, -0.36);
-      for (const sx of [-1, 1]) add(this.chest, new THREE.BoxGeometry(0.025, 0.32, 0.012), m.accent, sx * 0.13, 0.04, -0.395); // glow strips (readability)
-      addR(this.chest, new THREE.CylinderGeometry(0.012, 0.012, 0.4, 5), m.vest, 0.14, 0.42, -0.3, 0.15); // antenna
-      add(this.chest, new THREE.SphereGeometry(0.025, 6, 4), m.accent, 0.14, 0.63, -0.33);
-      for (const sx of [-1, 1]) { addR(this.chest, RB(0.18, 0.1, 0.22, 0.04), m.plate, sx * 0.26, 0.21, 0, 0, 0, sx * -0.4); addR(this.chest, new THREE.BoxGeometry(0.1, 0.015, 0.012), m.accent, sx * 0.29, 0.26, 0.11, 0, 0, sx * -0.4); }
-    } else if (kind === 'raider') {
+      // dark scavenger-operator: gunmetal plate carrier, rust scarf, asymmetric heavy left pauldron,
+      // long split duster coat (separate swaying bone), cyan running lights for identity.
+      add(this.chest, capsule(0.17, 0.2), m.cloth, 0, 0.02, 0, 1.3, 1, 0.85);
+      add(this.chest, RB(0.44, 0.42, 0.31, 0.05), m.vest, 0, 0.03, 0);
+      add(this.chest, RB(0.36, 0.3, 0.07, 0.025), m.plate, 0, 0.08, 0.16); // front plate
+      add(this.chest, new THREE.BoxGeometry(0.22, 0.03, 0.012), m.accent, 0, 0.17, 0.2); // chest light bar
+      for (let i = 0; i < 3; i++) add(this.chest, RB(0.085, 0.11, 0.06, 0.015, 1), m.pants, -0.11 + i * 0.11, -0.11, 0.19);
+      add(this.chest, new THREE.TorusGeometry(0.13, 0.055, 6, 14), m.cloth2, 0, 0.27, 0.0, 1.1, 1, 0.9, Math.PI / 2, 0, 0); // scarf
+      addR(this.chest, RB(0.12, 0.3, 0.05, 0.02), m.cloth2, 0.06, 0.12, 0.17, 0.1, 0, 0.25); // scarf tail
+      add(this.chest, RB(0.34, 0.4, 0.2, 0.05), m.vest, 0, 0.04, -0.25); // pack
+      add(this.chest, new THREE.CylinderGeometry(0.06, 0.06, 0.34, 8), m.plate, 0, 0.27, -0.27, 1, 1, 1, 0, 0, Math.PI / 2); // bedroll/canister
+      for (const sx of [-1, 1]) add(this.chest, new THREE.BoxGeometry(0.025, 0.3, 0.012), m.accent, sx * 0.12, 0.03, -0.355);
+      addR(this.chest, new THREE.CylinderGeometry(0.01, 0.01, 0.45, 4), m.vest, -0.12, 0.45, -0.3, -0.15); // antenna
+      add(this.chest, new THREE.SphereGeometry(0.022, 6, 4), m.accent, -0.12, 0.68, -0.34);
+      // asymmetric shoulders: heavy layered plate on the left, light strap on the right
+      addR(this.chest, RB(0.24, 0.12, 0.3, 0.05), m.plate, -0.28, 0.23, 0, 0, 0, 0.45);
+      addR(this.chest, RB(0.2, 0.08, 0.26, 0.04), m.plate, -0.31, 0.13, 0, 0, 0, 0.75);
+      addR(this.chest, new THREE.BoxGeometry(0.14, 0.018, 0.012), m.accent, -0.3, 0.27, 0.15, 0, 0, 0.45);
+      addR(this.chest, RB(0.14, 0.06, 0.18, 0.02), m.vest, 0.26, 0.21, 0, 0, 0, -0.4);
+      // duster coat tails hang from the belt on their own bone
+      this.cape = G(this.hips, 0, 0.06, 0);
+      for (const [x, z, ry] of [[-0.17, -0.06, 0.25], [-0.06, -0.14, 0], [0.06, -0.14, 0], [0.17, -0.06, -0.25], [-0.19, 0.06, 0.6], [0.19, 0.06, -0.6]]) addR(this.cape, new THREE.BoxGeometry(0.13, 0.62, 0.02), m.cloth, x, -0.33, z, 0, ry, 0);
+        } else if (kind === 'raider') {
       add(this.chest, capsule(0.17, 0.2), m.cloth, 0, 0.02, 0, 1.3, 1, 0.82);
       add(this.chest, RB(0.4, 0.36, 0.28, 0.05), m.vest, 0, 0.02, 0);
       // scavenged armour: random plates, tyre pauldron, bandolier
@@ -142,10 +153,12 @@ export class Humanoid {
     this.head = G(this.neck, 0, brute ? 0.12 : 0.13, mutant ? 0.04 : 0);
     if (kind === 'player') {
       add(this.head, new THREE.SphereGeometry(0.115, 14, 10), m.skin, 0, 0, 0, 0.95, 1.08, 1.0);
-      add(this.head, new THREE.SphereGeometry(0.14, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.6), m.plate, 0, 0.02, -0.005, 1, 0.95, 1.06); // helmet
-      add(this.head, RB(0.22, 0.065, 0.08, 0.02, 1), m.accent, 0, 0.0, 0.1); // visor
-      addR(this.head, new THREE.CylinderGeometry(0.04, 0.045, 0.07, 8), m.vest, 0, -0.07, 0.1, Math.PI / 2); // respirator
-      add(this.head, new THREE.BoxGeometry(0.04, 0.04, 0.08), m.vest, 0.14, 0.04, 0.02); // headlamp
+      add(this.head, new THREE.SphereGeometry(0.145, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), m.plate, 0, 0.02, -0.01, 1, 0.98, 1.08); // helmet
+      add(this.head, RB(0.24, 0.07, 0.09, 0.025, 1), m.accent, 0, 0.0, 0.1); // visor
+      add(this.head, RB(0.16, 0.08, 0.1, 0.03), m.vest, 0, -0.08, 0.08); // rebreather
+      for (const sx of [-1, 1]) add(this.head, new THREE.CylinderGeometry(0.03, 0.03, 0.05, 8), m.vest, sx * 0.08, -0.1, 0.07, 1, 1, 1, 1.2, 0, sx * 0.5);
+      add(this.head, new THREE.BoxGeometry(0.04, 0.05, 0.1), m.vest, 0.15, 0.03, 0.02); // headlamp
+      add(this.head, new THREE.BoxGeometry(0.03, 0.015, 0.012), m.accent, 0.15, 0.03, 0.075);
     } else if (kind === 'raider') {
       const hv = rnd();
       add(this.head, new THREE.SphereGeometry(0.115, 12, 8), m.skin, 0, 0, 0, 0.95, 1.08, 1.0);
@@ -217,66 +230,80 @@ export class Humanoid {
     this.weaponMount = G(this.chest, 0.08, 0.02, 0.32);
     this.weapon = null;
     root.scale.setScalar(K.scale);
+    this.flashC = { player: [1.2, 0.3, 0.2], raider: [2.2, 1.3, 0.8], mutant: [1.6, 2.2, 0.6], brute: [2.4, 1.4, 0.6] }[kind];
     this.phase = Math.random() * 6; this.legYaw = 0; this.flash = 0; this.flinch = new V(); this.flinchV = new V(); this.recoil = 0;
-    this.deathT = -1; this.deathDir = 1; this.dissolve = 0;
+    this.deathT = -1; this.deathDir = 1; this.dissolve = 0; this.dissolveAt = 11;
     this.attackT = -1; this.crouch = 0; this.crouchB = 0; this.capeSwing = 0; this.lean = { x: 0, z: 0 }; this.lastFace = 0; this.turnRate = 0;
     this.pump = 0; this.stepCb = null; this.lastStep = 0;
     this.bake(fab);
   }
 
-  // Merge every bone's meshes into one vertex-coloured mesh (+1 per glow material) -> ~20 draw calls per character.
+  // Bake the whole rig into ONE vertex-coloured SkinnedMesh (each Group is a rigid bone, glow parts carry a
+  // per-vertex emissive attribute) -> 1 draw call (+1 shadow) per character, so hordes stay cheap.
   bake(fab) {
     this.bodyMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.15, normalMap: fab.normalMap });
     this.bodyMat.normalScale.set(0.6, 0.6);
-    // fresnel rim light keeps characters readable against the dark ground (The Ascent-style), plus a
-    // noise dissolve with a burning edge for corpses.
+    // fresnel rim light keeps characters readable against the dark ground (The Ascent-style); hits add a
+    // short tinted rim flash; corpses burn away with a noise dissolve.
     this.rim = { value: new THREE.Color(...this.K.rim) };
+    this.uFlash = { value: new THREE.Color(0, 0, 0) };
     this.uDissolve = { value: 0 };
     this.bodyMat.onBeforeCompile = (sh) => {
-      sh.uniforms.uRim = this.rim; sh.uniforms.uDissolve = this.uDissolve;
-      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vDPos;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvDPos = position;');
+      sh.uniforms.uRim = this.rim; sh.uniforms.uDissolve = this.uDissolve; sh.uniforms.uFlash = this.uFlash;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vDPos; attribute vec3 aEmis; varying vec3 vEmis;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvDPos = position; vEmis = aEmis;');
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-uniform vec3 uRim; uniform float uDissolve; varying vec3 vDPos;
+uniform vec3 uRim; uniform vec3 uFlash; uniform float uDissolve; varying vec3 vDPos; varying vec3 vEmis;
 float dh(vec3 p){ return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
 float dn(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(mix(dh(i), dh(i + vec3(1,0,0)), f.x), mix(dh(i + vec3(0,1,0)), dh(i + vec3(1,1,0)), f.x), f.y),
              mix(mix(dh(i + vec3(0,0,1)), dh(i + vec3(1,0,1)), f.x), mix(dh(i + vec3(0,1,1)), dh(i + vec3(1,1,1)), f.x), f.y), f.z); }`)
         .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
 float dsv = 1.0; if (uDissolve > 0.0) { dsv = dn(vDPos * 18.0) * 0.6 + dn(vDPos * 47.0) * 0.4; if (dsv < uDissolve) discard; }`)
-        .replace('#include <opaque_fragment>', `outgoingLight += uRim * pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 2.5);
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vEmis;')
+        .replace('#include <opaque_fragment>', `float fres = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 2.8);
+outgoingLight += uRim * fres + uFlash * (fres * 1.6 + 0.08);
 if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); outgoingLight = mix(outgoingLight * (1.0 - uDissolve * 0.6), vec3(6.0, 1.6, 0.25), e); }
 #include <opaque_fragment>`);
     };
-    this.bodyMat.customProgramCacheKey = () => 'rim-dissolve';
-    const groups = []; this.root.traverse((o) => { if (o.isGroup) groups.push(o); });
-    const glow = new Set([this.mats.accent, this.mats.eye]);
-    for (const g of groups) {
-      const meshes = g.children.filter((c) => c.isMesh);
-      if (!meshes.length) continue;
-      const buckets = new Map();
-      for (const me of meshes) {
-        const key = glow.has(me.material) ? me.material : this.bodyMat;
+    this.bodyMat.customProgramCacheKey = () => 'rim-dissolve-skin';
+    this.root.updateMatrixWorld(true);
+    const invRoot = this.root.matrixWorld.clone().invert();
+    const bones = []; this.root.traverse((o) => { if (o.isGroup) bones.push(o); });
+    const glow = new Map([[this.mats.accent, this.mats.accent.emissive.clone().multiplyScalar(this.mats.accent.emissiveIntensity)], [this.mats.eye, this.mats.eye.emissive.clone().multiplyScalar(this.mats.eye.emissiveIntensity)]]);
+    const parts = [], M = new THREE.Matrix4();
+    bones.forEach((g, bi) => {
+      for (const me of g.children.filter((c) => c.isMesh)) {
         me.updateMatrix();
-        if (Math.abs(me.matrix.determinant()) < 1e-12) { g.remove(me); continue; } // degenerate scale -> NaN normals
-        let geo = me.geometry.clone().applyMatrix4(me.matrix);
+        g.remove(me);
+        if (Math.abs(me.matrix.determinant()) < 1e-12) { me.geometry.dispose(); continue; } // degenerate scale -> NaN normals
+        M.multiplyMatrices(invRoot, g.matrixWorld).multiply(me.matrix); // part -> root (bind) space
+        let geo = me.geometry.clone().applyMatrix4(M);
+        me.geometry.dispose();
         if (geo.index) geo = geo.toNonIndexed();
         for (const k of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(k)) geo.deleteAttribute(k);
         if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
-        const c = me.material.color, n = geo.attributes.position.count, ca = new Float32Array(n * 3);
-        for (let i = 0; i < n; i++) { ca[i * 3] = c.r; ca[i * 3 + 1] = c.g; ca[i * 3 + 2] = c.b; }
+        const n = geo.attributes.position.count, ca = new Float32Array(n * 3), ea = new Float32Array(n * 3), si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+        const em = glow.get(me.material), c = em ? new THREE.Color(0, 0, 0) : me.material.color;
+        for (let i = 0; i < n; i++) {
+          ca[i * 3] = c.r; ca[i * 3 + 1] = c.g; ca[i * 3 + 2] = c.b;
+          if (em) { ea[i * 3] = em.r; ea[i * 3 + 1] = em.g; ea[i * 3 + 2] = em.b; }
+          si[i * 4] = bi; sw[i * 4] = 1;
+        }
         geo.setAttribute('color', new THREE.BufferAttribute(ca, 3));
-        if (!buckets.has(key)) buckets.set(key, []);
-        buckets.get(key).push(geo);
-        g.remove(me); me.geometry.dispose();
+        geo.setAttribute('aEmis', new THREE.BufferAttribute(ea, 3));
+        geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+        geo.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
+        parts.push(geo);
       }
-      for (const [mat, list] of buckets) {
-        const merged = mergeGeometries(list, false);
-        const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = mat === this.bodyMat; mesh.receiveShadow = true;
-        g.add(mesh);
-      }
-    }
-    for (const k of Object.keys(this.mats)) if (!glow.has(this.mats[k])) this.mats[k].dispose();
+    });
+    const merged = mergeGeometries(parts, false); for (const p of parts) p.dispose();
+    const mesh = this.skin = new THREE.SkinnedMesh(merged, this.bodyMat);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    this.root.add(mesh); mesh.updateMatrixWorld(true);
+    mesh.bind(new THREE.Skeleton(bones), mesh.matrixWorld);
+    mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 1, 0), 2.2); // cheap culling bound (animated)
+    for (const k of Object.keys(this.mats)) this.mats[k].dispose();
     this.allMats = [this.bodyMat];
   }
 
@@ -309,7 +336,7 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
     this.deathSide = (Math.random() - 0.5) * 2;
     this.deathArms = [Math.random(), Math.random()];
     if (opts.gib) this.root.visible = false;
-    if (opts.headshot) { this.head.visible = false; this.headless = 1.2; }
+    if (opts.headshot) { this.headless = 1.2; this.head.scale.setScalar(0.001); }
     this.deathPose = { sp: this.spine.rotation.x, hy: this.hips.position.y };
   }
   bodyAnchor() { this.hips.updateWorldMatrix(true, false); return _v4.setFromMatrixPosition(this.hips.matrixWorld); }
@@ -335,7 +362,7 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
   update(dt, s) {
     this.flash = Math.max(0, this.flash - dt * 14);
     const fl = this.flash * this.flash;
-    for (const mt of this.allMats) mt.emissive.setRGB(fl * 1.5, fl * 1.4, fl * 1.3); // white hit flash
+    this.uFlash.value.setRGB(fl * this.flashC[0], fl * this.flashC[1], fl * this.flashC[2]); // tinted rim flash
     // damped spring flinch (overshoots a little = reads as impact)
     this.flinchV.addScaledVector(this.flinch, -160 * dt).multiplyScalar(Math.exp(-14 * dt));
     this.flinch.addScaledVector(this.flinchV, dt);
@@ -390,17 +417,20 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
     }
     // roll: tucked somersault pivoting around the body centre
     if (s.rolling) {
-      const p = clamp(s.rollP, 0, 1), e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      // anticipation (dip + lean) -> tucked somersault around the body centre -> recovery crouch
+      const p = clamp(s.rollP, 0, 1), A = 0.14, R = 0.78;
+      const rp = clamp((p - A) / (R - A), 0, 1), e = rp < 0.5 ? 2 * rp * rp : 1 - Math.pow(-2 * rp + 2, 2) / 2;
       const th = e * Math.PI * 2, C = 0.72;
-      this.body.rotation.x = th;
-      const tuck = Math.min(1, Math.sin(p * Math.PI) * 1.6);
-      // pivot = body-local point at height C; keep it at world height Cw so the tucked ball never sinks
-      const Cw = C - tuck * 0.12;
+      const ant = p < A ? p / A : Math.max(0, 1 - (p - A) / 0.12), rec = p > R ? 1 - (p - R) / (1 - R) : 0;
+      const tuck = Math.min(1, Math.sin(rp * Math.PI) * 1.6);
+      this.body.rotation.x = th + ant * 0.35;
+      const Cw = C - tuck * 0.12 - ant * 0.1 - rec * 0.15;
       this.body.position.set(0, Cw - C * Math.cos(th), -C * Math.sin(th));
-      this.hips.position.y = this.P.hipY - tuck * 0.3;
-      for (const L of this.legs) { L.hp.rotation.x = -1.6 * tuck - 0.2; L.kn.rotation.x = 2.3 * tuck + 0.1; }
-      this.spine.rotation.x = 0.2 + tuck * 0.9;
-      this.head.rotation.x = tuck * 0.6;
+      const crouch = Math.max(tuck, ant * 0.6, rec * 0.8);
+      this.hips.position.y = this.P.hipY - crouch * 0.3;
+      for (const L of this.legs) { L.hp.rotation.x = -1.6 * crouch - 0.2 * (1 - rec); L.kn.rotation.x = 2.3 * crouch + 0.1; L.ft.rotation.x = crouch * 0.4; }
+      this.spine.rotation.x = 0.2 + crouch * 0.9;
+      this.head.rotation.x = crouch * 0.6;
     } else {
       this.body.rotation.x = damp(this.body.rotation.x % (Math.PI * 2), 0, 20, dt);
       this.body.position.y = damp(this.body.position.y, 0, 20, dt);
@@ -408,7 +438,7 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
     }
     if (this.cape) { // cloth lags behind motion
       this.capeSwing = damp(this.capeSwing, run * 0.7 + Math.sin(ph * 2) * 0.06 * amp, 4, dt);
-      this.cape.rotation.x = -this.capeSwing - fL.z * 0.6 - this.P.hunch * 0.5; this.cape.rotation.z = -this.lean.z * 1.5 + Math.sin(ph) * 0.05;
+      this.cape.rotation.x = (-this.capeSwing - fL.z * 0.6) * (this.kind === 'player' ? 0.5 : 1) - this.P.hunch * 0.5; this.cape.rotation.z = -this.lean.z * 1.5 + Math.sin(ph) * 0.05;
     }
 
     // arms
@@ -465,7 +495,7 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
   updateDeath(dt) {
     this.deathT += dt;
     const T0 = this.deathT, mode = this.deathMode;
-    this.uDissolve.value = T0 > 3.4 && this.kind !== 'player' ? Math.min(1.05, (T0 - 3.4) / 2.2) : 0;
+    this.uDissolve.value = T0 > this.dissolveAt && this.kind !== 'player' ? Math.min(1.05, (T0 - this.dissolveAt) / 2.4) : 0;
     this.dissolve = this.uDissolve.value;
     if (mode === 'gib') return;
     // yaw toward the fall direction (fast), plus spin variant
@@ -505,5 +535,5 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
     }
     if (this.headless > 0) this.headless -= dt;
   }
-  dispose() { this.root.traverse((o) => { if (o.isMesh && !o.userData.shared) o.geometry.dispose(); }); this.bodyMat.dispose(); this.mats.accent.dispose(); this.mats.eye.dispose(); }
+  dispose() { this.root.traverse((o) => { if (o.isMesh && !o.userData.shared) o.geometry.dispose(); }); this.bodyMat.dispose(); if (this.skin) this.skin.skeleton.dispose(); }
 }

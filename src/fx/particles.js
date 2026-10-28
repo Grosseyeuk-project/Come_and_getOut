@@ -122,12 +122,22 @@ export class StreakSystem {
   emit(o) {
     if (this.p.length >= this.max) this.p.shift();
     this.p.push({ x: o.x, y: o.y, z: o.z, vx: o.vx || 0, vy: o.vy || 0, vz: o.vz || 0, life: o.life || 0.3, t: 0, trail: o.trail ?? 0.03,
-      w: o.w ?? 0.02, c0: o.c0 || [4, 2.5, 1, 1], c1: o.c1 || [1, 0.2, 0, 0], grav: o.grav ?? 9, drag: o.drag ?? 1, bounce: o.bounce ?? 0.4, floor: o.floor ?? 0.02 });
+      w: o.w ?? 0.02, c0: o.c0 || [4, 2.5, 1, 1], c1: o.c1 || [1, 0.2, 0, 0], grav: o.grav ?? 9, drag: o.drag ?? 1, bounce: o.bounce ?? 0.4, floor: o.floor ?? 0.02, tr: o.tracer || null });
+  }
+  // Tracer round: head flies from origin to the hit point and stops there; the tail (tailT seconds long)
+  // keeps travelling and collapses into the hit, so the round reads as a dash with a short tail.
+  tracer(x0, y0, z0, x1, y1, z1, speed, tailT, w, c0, c1 = c0) {
+    const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0, len = Math.hypot(dx, dy, dz);
+    if (!(len > 0.05)) return;
+    const tl = speed * tailT;
+    this.emit({ x: x0, y: y0, z: z0, life: (len + tl) / speed, w, c0, c1, grav: 0, drag: 0, floor: -99,
+      tracer: { x0, y0, z0, ux: dx / len, uy: dy / len, uz: dz / len, len, speed, tl } });
   }
   update(dt) {
     const P = this.p; let w = 0;
     for (let i = 0; i < P.length; i++) {
       const q = P[i]; q.t += dt; if (q.t >= q.life) continue;
+      if (q.tr) { P[w++] = q; continue; }
       const k = Math.exp(-q.drag * dt);
       q.vx *= k; q.vz *= k; q.vy = q.vy * k - q.grav * dt;
       q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt;
@@ -137,8 +147,14 @@ export class StreakSystem {
     P.length = w;
     for (let i = 0; i < w; i++) {
       const q = P[i], f = q.t / q.life, tr = q.trail;
+      if (q.tr) {
+        const T = q.tr, d = T.speed * q.t, hd = Math.min(d, T.len), td = Math.max(0, Math.min(d - T.tl, T.len - 0.02));
+        this.head[i * 3] = T.x0 + T.ux * hd; this.head[i * 3 + 1] = T.y0 + T.uy * hd; this.head[i * 3 + 2] = T.z0 + T.uz * hd;
+        this.tail[i * 3] = T.x0 + T.ux * td; this.tail[i * 3 + 1] = T.y0 + T.uy * td; this.tail[i * 3 + 2] = T.z0 + T.uz * td;
+      } else {
       this.head[i * 3] = q.x; this.head[i * 3 + 1] = q.y; this.head[i * 3 + 2] = q.z;
       this.tail[i * 3] = q.x - q.vx * tr; this.tail[i * 3 + 1] = q.y - q.vy * tr; this.tail[i * 3 + 2] = q.z - q.vz * tr;
+      }
       for (let c = 0; c < 4; c++) this.col[i * 4 + c] = q.c0[c] + (q.c1[c] - q.c0[c]) * f;
       this.w[i] = q.w * (1 - f * 0.5);
     }

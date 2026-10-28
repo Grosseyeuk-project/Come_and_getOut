@@ -131,7 +131,8 @@ export class Environment {
   }
   place(parts, x, y, z, ry = 0, s = 1, rx = 0, rz = 0) {
     const m = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz, 'YXZ')), new THREE.Vector3(s, s, s));
-    for (const p of parts) { const g = p.geo.index ? p.geo.toNonIndexed() : p.geo; g.applyMatrix4(m); this.batch.add(p.mat, g); }
+    const W = this.worldUV || (this.worldUV = new Map([[this.M.slab, 0.33], [this.M.trim, 0.5], [this.M.plasterWall, 0.33], [this.M.brickWall, 0.33], [this.M.concreteWall, 0.33], [this.M.shutter, 0.5], [this.M.awning, 0.6], [this.M.rubble, 0.4], [this.M.roof, 0.3], [this.M.deckTop, 1 / 6], [this.M.kitMetal, 0.6], [this.M.kitRust, 0.6], [this.M.rust, 0.6], [this.M.metal, 0.6]]));
+    for (const p of parts) { const g = p.geo.index ? p.geo.toNonIndexed() : p.geo; g.applyMatrix4(m); if (W.has(p.mat)) boxUV(g, W.get(p.mat)); this.batch.add(p.mat, g); }
   }
 
   buildGround() {

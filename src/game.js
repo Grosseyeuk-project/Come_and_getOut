@@ -102,11 +102,11 @@ export class Game {
     pad.position.y = 0.06; pad.receiveShadow = true; g.add(pad);
     const ring = new THREE.Mesh(new THREE.RingGeometry(4.0, 4.3, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.3, 2.2, 0.8), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
     ring.position.y = 0.08; g.add(ring); this.exRing = ring;
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.6, 40, 16, 1, true).translate(0, 20, 0), new THREE.MeshBasicMaterial({ map: T.beamTex(), color: new THREE.Color(0.12, 0.6, 0.25), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.6, 37, 16, 1, true).translate(0, 3.2 + 18.5, 0), new THREE.MeshBasicMaterial({ map: T.beamTex(), color: new THREE.Color(0.12, 0.6, 0.25), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
     g.add(beam);
     for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + 0.6; const f = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 6), new THREE.MeshStandardMaterial({ color: 0, emissive: 0x30ff70, emissiveIntensity: 6 })); f.position.set(Math.cos(a) * 3.7, 0.15, Math.sin(a) * 3.7); g.add(f); }
     this.scene.add(g); this.exGroup = g;
-    this.lighting.addSource(new THREE.Vector3(ex.x, 1.5, ex.z), 0x40ff80, 30, 14, 'pulse', { priority: 2 });
+    this.lighting.addSource(new THREE.Vector3(ex.x, 0.5, ex.z), 0x40ff80, 12, 10, 'pulse', { priority: 2 }); // low + dim: marks the pad without tinting the player
     this.fx.addSmoker(ex.x + 2.5, 0.3, ex.z + 2.5, 0.6);
     this.exSmoke = this.fx.smokers[this.fx.smokers.length - 1]; this.exSmoke.green = true;
   }
@@ -203,7 +203,7 @@ export class Game {
       this.extractT += dt;
       // escalating waves while holding the zone
       this.waveT = (this.waveT ?? 1) - dt;
-      if (this.waveT <= 0) { this.waveT = 4.2; this.spawnEvacWave(3 + Math.floor(this.extractT / 4)); }
+      if (this.waveT <= 0) { this.waveT = 3.6; this.spawnEvacWave(8 + Math.floor(this.extractT / 2)); }
       if (Math.floor(prev) !== Math.floor(this.extractT)) this.audio.play('beep', null, { f: 880 });
       if (this.extractT >= this.extractDur) {
         this.mode = 'extracted'; this.audio.play('extracted');
@@ -215,13 +215,13 @@ export class Game {
   spawnEvacWave(n) {
     const ex = this.extraction, rng = this.waveRng || (this.waveRng = new RNG(this.seed ^ 0x3a3a));
     const alive = this.enemies.alive.filter((e) => e.group === 'wave').length;
-    n = Math.min(n, 18 - alive); if (n <= 0) return;
+    n = Math.min(n, 34 - alive); if (n <= 0) return;
     const dirs = [rng.range(0, 6.28)]; if (this.extractT > 6) dirs.push(dirs[0] + rng.range(1.6, 4.6));
     for (let i = 0; i < n; i++) {
       const a = dirs[i % dirs.length] + rng.range(-0.45, 0.45), r = rng.range(17, 26);
       const p = this.nav.nearestWalkable(ex.x + Math.cos(a) * r, ex.z + Math.sin(a) * r, 6);
       if (!p || !this.nav.isReachable(p.x, p.z)) continue;
-      const type = rng.weighted([['mutant', 7], ['raider', 3], ['brute', this.extractT > 9 && i === 0 ? 3 : 0]]);
+      const type = i === 0 && this.extractT > 8 ? 'brute' : rng.weighted([['mutant', 8], ['raider', 2]]);
       const e = this.enemies.spawn(type, p.x, p.z, 'wave'); if (e) this.enemies.alertE(e, this.player.pos.x, this.player.pos.z, false);
     }
     if (this.hud && this.extractT > 1) this.audio.play('scream', { x: ex.x + Math.cos(dirs[0]) * 15, z: ex.z + Math.sin(dirs[0]) * 15 }, { pitch: 0.8 });

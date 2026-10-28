@@ -55,7 +55,7 @@ export class Combat {
       if (shotgun && h.n >= 3 && !e.dead) { e.stagger = Math.max(e.stagger, 0.35 * res); e.hum.hit(h.dx, h.dz, 2.2 * res); }
     }
     this.shot = null;
-    g.fx.muzzle(m.x, m.y, m.z, ax, az, shotgun ? 1.9 : w.base === 'dmr' ? 1.4 : w.base === 'smg' ? 0.8 : 1);
+    g.fx.muzzle(m.x, m.y, m.z, ax, az, 1, undefined, w.base);
     if (shotgun) w.pumpT = 0.28; // casing ejected on the pump
     else g.fx.casing(m.x - ax * 0.45, m.y + 0.03, m.z - az * 0.45, ax, az, false);
     g.audio.play(B.sound, pl.pos, { minGap: 0.02 });

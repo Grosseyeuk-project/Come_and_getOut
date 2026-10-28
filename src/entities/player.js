@@ -17,7 +17,7 @@ export class Player {
     this.face = 0; this.radius = 0.42;
     this.maxHp = 100; this.hp = 100;
     this.charges = 2; this.maxCharges = 2; this.chargeT = 0;
-    this.rollT = -1; this.rollDur = 0.42; this.rollDir = { x: 0, z: 1 };
+    this.rollT = -1; this.rollDur = 0.5; this.rollDir = { x: 0, z: 1 };
     this.invuln = 0; this.god = false;
     const rng = new RNG(game.seed ^ 0x77);
     this.weapons = [rollWeapon(rng, 'common', 'rifle'), rollWeapon(rng, 'common', 'shotgun')];

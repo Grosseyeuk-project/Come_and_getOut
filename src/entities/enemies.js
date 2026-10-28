@@ -129,6 +129,9 @@ export class EnemyManager {
 
   update(dt) {
     const g = this.game, pl = g.player, col = g.col;
+    // corpse budget: beyond 24 bodies the oldest start burning away early
+    const dead = this.list.filter((e) => e.dead && e.hum.dissolveAt > e.deadT);
+    if (dead.length > 24) { dead.sort((a, b) => b.deadT - a.deadT); for (let i = 0; i < dead.length - 24; i++) dead[i].hum.dissolveAt = dead[i].deadT; }
     for (const e of this.list) {
       const hum = e.hum, def = e.def;
       if (e.dead) {
@@ -144,7 +147,7 @@ export class EnemyManager {
         if (hum.headless > 0 && Math.random() < 0.7) { const n = hum.neckWorld(); g.fx.bloodHit(n.x, n.y, n.z, (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6, undefined, 0.35); }
         if (e.poolAt && e.deadT > e.poolAt) { e.poolAt = 0; const b = hum.bodyAnchor(); g.fx.pool(b.x, b.z, (0.9 + Math.random() * 0.6) * hum.K.scale, e.type === 'mutant' ? 'ichor' : 'blood', 0); }
         if (hum.dissolve > 0 && Math.random() < 0.5) { const b = hum.bodyAnchor(); g.fx.embers(b.x, 0.2, b.z, 1); }
-        if (e.deadT > 8.5) { e.remove = true; }
+        if (e.deadT > hum.dissolveAt + 2.6) { e.remove = true; }
         continue;
       }
       // cheap distance culling: far, unalerted enemies idle

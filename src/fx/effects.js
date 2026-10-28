@@ -11,9 +11,9 @@ export class Effects {
     this.add = new ParticleSystem(scene, { max: 3000, map: T.softSprite('spark', 1, 0), additive: true });
     this.fire = new ParticleSystem(scene, { max: 1500, map: T.softSprite('fire', 1, 0), additive: true });
     this.smoke = new ParticleSystem(scene, { max: 1600, map: T.smokeSprite(), additive: false });
-    this.debris = new ParticleSystem(scene, { max: 800, map: T.softSprite('chunk', 1, 0.9), additive: false });
+    this.debris = new ParticleSystem(scene, { max: 2400, map: T.softSprite('chunk', 1, 0.9), additive: false });
     this.star = new ParticleSystem(scene, { max: 300, map: starTex(), additive: true });
-    this.wet = new ParticleSystem(scene, { max: 1500, map: T.softSprite('wet', 1, 0), additive: false });
+    this.wet = new ParticleSystem(scene, { max: 2500, map: T.softSprite('wet', 1, 0), additive: false });
     this.streaks = new StreakSystem(scene, 1800);
     const brass = new THREE.MeshStandardMaterial({ color: 0xc89a48, metalness: 1, roughness: 0.28, emissive: 0x2a1a06 });
     const cg = new THREE.CylinderGeometry(0.012, 0.012, 0.05, 6); cg.rotateZ(Math.PI / 2);
@@ -44,7 +44,7 @@ export class Effects {
     this.wetMats = [...BLOOD.splatMats, BLOOD.poolMat, ...ICHOR.splatMats, ICHOR.poolMat];
     this.flashes = [];
     const fg = new THREE.PlaneGeometry(1, 0.5); fg.rotateX(-Math.PI / 2); fg.translate(0.5 - 40 / 256, 0, 0); this.flashGeo = fg;
-    this.flashMat = new THREE.MeshBasicMaterial({ map: T.muzzleTex(), color: new THREE.Color(2.2, 1.7, 1.2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+    this.flashMat = new THREE.MeshBasicMaterial({ map: T.muzzleTex(), color: new THREE.Color(1.5, 1.05, 0.65), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
     this.time = 0;
     this.dustT = 0; this.mistT = 0; this.emberT = 0;
     this.mistColor = [0.5, 0.5, 0.52]; this.ambientEmbers = 0.5; this.ash = 0;
@@ -75,32 +75,54 @@ export class Effects {
     const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0, len = Math.hypot(dx, dy, dz);
     if (!(len > 0.05) || !isFinite(len)) return;
     const S = BULLETS[kind] || BULLETS.rifle, sp = S.speed * (0.92 + Math.random() * 0.16);
-    const ux = dx / len, uy = dy / len, uz = dz / len;
-    // start slightly ahead so the dash leaves the barrel instead of appearing inside the gun
-    this.streaks.emit({ x: x0 + ux * 0.2, y: y0 + uy * 0.2, z: z0 + uz * 0.2, vx: ux * sp, vy: uy * sp, vz: uz * sp, life: Math.max(0.016, (len - 0.2) / sp), trail: S.trail, w: S.w, c0: S.c, c1: S.c, grav: 0, drag: 0, floor: -99 });
-    if (S.core) this.streaks.emit({ x: x0 + ux * 0.2, y: y0 + uy * 0.2, z: z0 + uz * 0.2, vx: ux * sp, vy: uy * sp, vz: uz * sp, life: Math.max(0.016, (len - 0.2) / sp), trail: S.trail * 0.7, w: S.w * 0.4, c0: S.core, c1: S.core, grav: 0, drag: 0, floor: -99 });
-    if (kind === 'dmr') { // heat trail
+    this.streaks.tracer(x0, y0, z0, x1, y1, z1, sp, S.tail, S.w, S.c, S.c1 || S.c);
+    if (S.core) this.streaks.tracer(x0, y0, z0, x1, y1, z1, sp, S.tail * 0.6, S.w * 0.4, S.core);
+    if (kind === 'dmr') { // lingering heat/smoke trail along the slug's path
       const n = Math.min(40, Math.round(len * 1.6));
-      for (let i = 0; i < n; i++) { const t = (i + Math.random()) / n; this.smoke.emit({ x: x0 + dx * t, y: y0 + dy * t, z: z0 + dz * t, vx: (Math.random() - 0.5) * 0.3, vy: 0.15, vz: (Math.random() - 0.5) * 0.3, life: 0.9 + Math.random() * 0.6, s0: 0.12, s1: 0.55, c0: [0.75, 0.73, 0.7, 0.32], c1: [0.6, 0.6, 0.6, 0], drag: 1 }); }
-      this.streaks.emit({ x: x1, y: y1, z: z1, vx: -ux * 0.01, vy: 0, vz: -uz * 0.01, life: 0.12, trail: Math.min(len, 30) / 0.01, w: 0.025, c0: [2.5, 2, 1.4, 0.8], c1: [0.6, 0.3, 0.1, 0], grav: 0, drag: 0, floor: -99 });
+      for (let i = 0; i < n; i++) { const t = (i + Math.random()) / n; this.smoke.emit({ x: x0 + dx * t, y: y0 + dy * t, z: z0 + dz * t, vx: (Math.random() - 0.5) * 0.3, vy: 0.15, vz: (Math.random() - 0.5) * 0.3, life: 0.9 + Math.random() * 0.6, s0: 0.1, s1: 0.45, c0: [0.75, 0.73, 0.7, 0.3], c1: [0.6, 0.6, 0.6, 0], drag: 1, fadeIn: t * 0.1 }); }
     }
   }
 
   // Muzzle blast: oriented flash card + star + forward cone of sparks + smoke, and a short bright light pulse
-  muzzle(x, y, z, dx, dz, scale = 1, color = [1, 0.75, 0.4]) {
-    const fm = new THREE.Mesh(this.flashGeo, this.flashMat);
-    fm.position.set(x, y, z); fm.rotation.y = Math.atan2(-dz, dx); fm.rotation.x = (Math.random() - 0.5) * 0.6;
-    const fs = (1.1 + Math.random() * 0.6) * scale; fm.scale.set(fs, 1, fs * (0.8 + Math.random() * 0.5)); fm.renderOrder = 8;
-    this.scene.add(fm); this.flashes.push({ m: fm, t: 0 });
-    this.star.emit({ x: x + dx * 0.05, y, z: z + dz * 0.05, life: 0.05, s0: 0.75 * scale, s1: 0.4 * scale, c0: [color[0] * 5, color[1] * 5, color[2] * 5, 1], c1: [color[0] * 2, color[1], color[2] * 0.5, 0] });
-    for (let i = 0; i < 3; i++) this.add.emit({ x: x + dx * 0.12 * i, y, z: z + dz * 0.12 * i, vx: dx * (3 + i * 3), vz: dz * (3 + i * 3), life: 0.06, s0: (0.7 - i * 0.15) * scale, s1: 0.12, c0: [color[0] * 4, color[1] * 4, color[2] * 4, 1], c1: [color[0], color[1] * 0.5, 0.1, 0] });
-    const ns = Math.round(5 * scale);
-    for (let i = 0; i < ns; i++) {
-      const sp = 10 + Math.random() * 14, a = (Math.random() - 0.5) * 0.7, ca = Math.cos(a), sa = Math.sin(a);
-      this.streaks.emit({ x, y, z, vx: (dx * ca - dz * sa) * sp, vy: (Math.random() - 0.3) * 3, vz: (dx * sa + dz * ca) * sp, life: 0.05 + Math.random() * 0.08, trail: 0.02, w: 0.018, c0: [5, 3.2, 1.2, 1], c1: [2, 0.6, 0.1, 0], grav: 2, drag: 4 });
+  // Muzzle blast, shaped per weapon: rifle = forward flame tongue + small side petals; smg = short
+  // stubby flicker; shotgun = wide flame cone + heavy smoke; dmr = long narrow jet + brake side vents.
+  muzzle(x, y, z, dx, dz, scale = 1, color = [1, 0.75, 0.4], kind = 'rifle') {
+    const yaw = Math.atan2(-dz, dx), px = -dz, pz = dx;
+    const card = (ang, len, wid, roll = 0) => {
+      const fm = new THREE.Mesh(this.flashGeo, this.flashMat);
+      fm.position.set(x, y, z); fm.rotation.set(roll, yaw + ang, 0, 'YXZ');
+      fm.scale.set(len * (0.85 + Math.random() * 0.3), 1, wid * (0.8 + Math.random() * 0.4)); fm.renderOrder = 8;
+      this.scene.add(fm); this.flashes.push({ m: fm, t: 0 });
+    };
+    const C = (k) => [color[0] * k, color[1] * k, color[2] * k, 1];
+    if (kind === 'shotgun') {
+      for (const a of [-0.3, 0, 0.3]) card(a, 1.15 - Math.abs(a) * 0.8, 0.7, (Math.random() - 0.5) * 0.8);
+      this.star.emit({ x: x + dx * 0.15, y, z: z + dz * 0.15, life: 0.04, s0: 0.5, s1: 0.3, c0: C(3), c1: [1, 0.4, 0.1, 0] });
+      for (let i = 0; i < 14; i++) { const a = (Math.random() - 0.5) * 0.9, sp = 8 + Math.random() * 14, ca = Math.cos(a), sa = Math.sin(a);
+        this.streaks.emit({ x, y, z, vx: (dx * ca - dz * sa) * sp, vy: (Math.random() - 0.3) * 3, vz: (dx * sa + dz * ca) * sp, life: 0.08 + Math.random() * 0.12, trail: 0.02, w: 0.025, c0: [5, 2.6, 0.8, 1], c1: [2, 0.4, 0.05, 0], grav: 4, drag: 3 }); }
+      for (let i = 0; i < 7; i++) { const a = (Math.random() - 0.5) * 0.9, sp = 2 + Math.random() * 4, ca = Math.cos(a), sa = Math.sin(a);
+        this.smoke.emit({ x: x + dx * 0.3, y, z: z + dz * 0.3, vx: (dx * ca - dz * sa) * sp, vy: 0.3 + Math.random() * 0.5, vz: (dx * sa + dz * ca) * sp, life: 1.2 + Math.random() * 0.8, s0: 0.3, s1: 1.4 + Math.random() * 0.8, c0: [0.6, 0.58, 0.55, 0.45], c1: [0.5, 0.5, 0.5, 0], drag: 2.4 }); }
+      this.flashLight(x + dx * 0.6, y + 0.3, z + dz * 0.6, 0xffa040, 30, 10, 0.06);
+      return;
     }
-    this.smoke.emit({ x: x + dx * 0.25, y, z: z + dz * 0.25, vx: dx * 1.6, vy: 0.5, vz: dz * 1.6, life: 0.9, s0: 0.3 * scale, s1: 1.3 * scale, c0: [0.55, 0.53, 0.5, 0.3], c1: [0.5, 0.5, 0.5, 0], drag: 2.2 });
-    this.flashLight(x + dx * 0.3, y + 0.25, z + dz * 0.3, 0xffa850, 45 * scale, 12 * Math.sqrt(scale), 0.055);
+    if (kind === 'dmr') {
+      card(0, 1.9, 0.55); card(Math.PI / 2, 0.5, 0.45); card(-Math.PI / 2, 0.5, 0.45); // jet + muzzle-brake vents
+      this.star.emit({ x, y, z, life: 0.05, s0: 0.6, s1: 0.3, c0: C(5), c1: [1, 0.4, 0.1, 0] });
+      for (const sgn of [-1, 1]) for (let i = 0; i < 3; i++) this.smoke.emit({ x, y, z, vx: px * sgn * (2 + Math.random() * 2) + dx * 0.5, vy: 0.3, vz: pz * sgn * (2 + Math.random() * 2) + dz * 0.5, life: 1.0, s0: 0.15, s1: 0.8, c0: [0.62, 0.6, 0.57, 0.4], c1: [0.5, 0.5, 0.5, 0], drag: 3 });
+      this.flashLight(x + dx * 0.4, y + 0.3, z + dz * 0.4, 0xffc070, 28, 10, 0.05);
+      return;
+    }
+    const smg = kind === 'smg';
+    card(0, (smg ? 0.75 : 1.1) * scale, (smg ? 0.8 : 0.85) * scale, Math.random() * 6.28);
+    if (!smg && Math.random() < 0.6) { card(0.9, 0.35, 0.4); card(-0.9, 0.35, 0.4); }
+    this.star.emit({ x: x + dx * 0.05, y, z: z + dz * 0.05, life: 0.04, s0: 0.45 * scale, s1: 0.25 * scale, c0: C(5), c1: [color[0] * 2, color[1], color[2] * 0.5, 0] });
+    const ns = smg ? 2 : 4;
+    for (let i = 0; i < ns; i++) {
+      const sp = 10 + Math.random() * 14, a = (Math.random() - 0.5) * 0.5, ca = Math.cos(a), sa = Math.sin(a);
+      this.streaks.emit({ x, y, z, vx: (dx * ca - dz * sa) * sp, vy: (Math.random() - 0.3) * 3, vz: (dx * sa + dz * ca) * sp, life: 0.05 + Math.random() * 0.06, trail: 0.02, w: 0.02, c0: [5, 3.2, 1.2, 1], c1: [2, 0.6, 0.1, 0], grav: 2, drag: 4 });
+    }
+    this.smoke.emit({ x: x + dx * 0.25, y, z: z + dz * 0.25, vx: dx * 1.6, vy: 0.5, vz: dz * 1.6, life: 0.9, s0: 0.25 * scale, s1: 1.0 * scale, c0: [0.55, 0.53, 0.5, 0.28], c1: [0.5, 0.5, 0.5, 0], drag: 2.2 });
+    this.flashLight(x + dx * 0.3, y + 0.25, z + dz * 0.3, 0xffa850, 22 * scale, 9 * Math.sqrt(scale), 0.045);
   }
 
   flashLight(x, y, z, color, intensity, range, ttl) {
@@ -125,58 +147,61 @@ export class Effects {
   impact(x, y, z, nx, nz, kind = 'concrete', bx = -nx, bz = -nz, power = 1) {
     if (!isFinite(x + y + z + nx + nz)) return;
     if (kind === 'flesh' || kind === 'ichor') return this.bloodHit(x, y, z, bx, bz, kind === 'ichor' ? ICHOR : BLOOD, power);
-    const metal = kind === 'metal';
+    const metal = kind === 'metal', wood = kind === 'wood', ground = kind === 'ground';
     const P = Math.min(2, power);
-    // white-hot flash
-    this.star.emit({ x: x + nx * 0.05, y, z: z + nz * 0.05, life: 0.07, s0: (metal ? 1.3 : 0.9) * (0.7 + P * 0.3), s1: 0.3, c0: metal ? [5, 4.2, 3, 1] : [4, 2.6, 1.4, 1], c1: [1.5, 0.6, 0.2, 0], rot: Math.random() * 6 });
-    // sparks: streaks spraying off the surface (reflect-ish cone around the normal)
-    const wood = kind === 'wood', ground = kind === 'ground';
-    const n = Math.round((metal ? 18 : wood ? 3 : ground ? 4 : 9) * P);
+    // ricochet axis: surface normal tilted up a little (ground hits kick mostly upward)
+    const ay = ground ? 1.4 : 0.35;
+    // small hard flash at the contact point (not a bloom blob)
+    this.star.emit({ x: x + nx * 0.05, y, z: z + nz * 0.05, life: 0.045, s0: metal ? 0.55 : 0.4, s1: 0.15, c0: metal ? [5, 4.4, 3.2, 1] : [4, 2.8, 1.6, 1], c1: [1.5, 0.6, 0.2, 0], rot: Math.random() * 6 });
+    // sparks: a directional cone of streaks
+    const n = Math.round((metal ? 24 : wood ? 5 : ground ? 7 : 14) * P);
     for (let i = 0; i < n; i++) {
-      const sp = (metal ? 6 : 4) + Math.random() * (metal ? 14 : 9);
-      const ox = nx + (Math.random() - 0.5) * 1.8, oz = nz + (Math.random() - 0.5) * 1.8;
-      this.streaks.emit({ x, y, z, vx: ox * sp, vy: (Math.random() * 1.2 - 0.2) * sp * 0.6, vz: oz * sp, life: 0.15 + Math.random() * (metal ? 0.5 : 0.3), trail: 0.025, w: metal ? 0.022 : 0.018,
-        c0: metal ? [6, 4.5, 2.2, 1] : [5, 2.6, 0.9, 1], c1: [1.4, 0.25, 0.02, 0], grav: 11, drag: 1.2, bounce: 0.45 });
+      const d = cone(nx, ay, nz, metal ? 0.55 : 0.45), sp = (metal ? 7 : 5) + Math.random() * (metal ? 14 : 9);
+      this.streaks.emit({ x, y, z, vx: d[0] * sp, vy: d[1] * sp, vz: d[2] * sp, life: 0.12 + Math.random() * (metal ? 0.45 : 0.25), trail: 0.03, w: metal ? 0.032 : 0.026,
+        c0: metal ? [6, 4.6, 2.4, 1] : [5, 2.7, 1, 1], c1: [1.4, 0.25, 0.02, 0], grav: 11, drag: 1.4, bounce: 0.45 });
     }
-    // hot embers that linger
-    for (let i = 0; i < (metal ? 4 : 2); i++) this.add.emit({ x, y, z, vx: (nx + (Math.random() - 0.5)) * 3, vy: Math.random() * 3, vz: (nz + (Math.random() - 0.5)) * 3, life: 0.4 + Math.random() * 0.5, s0: 0.07, s1: 0.02, c0: [4, 2, 0.6, 1], c1: [1, 0.2, 0, 0], grav: 8, drag: 1, floor: 0.03, bounce: 0.3 });
-    if (!metal) {
-      // dust puff: billowing cloud pushed out of the wall, lit by nothing (kept mid-grey to read in the dark)
-      for (let i = 0; i < (ground ? 4 : 5); i++) {
-        const sp = 0.8 + Math.random() * 2.6;
-        this.smoke.emit({ x, y, z, vx: nx * sp + (Math.random() - 0.5) * 1.2, vy: 0.2 + Math.random() * 1.0, vz: nz * sp + (Math.random() - 0.5) * 1.2, life: 0.9 + Math.random() * 0.9, s0: 0.25, s1: 1.3 + Math.random() * 0.6, c0: [0.62, 0.58, 0.52, 0.55], c1: [0.5, 0.48, 0.45, 0], drag: 3.2 });
-      }
-      // chips: 3D chunks + fine grit sprites
-      const nc = Math.round((1 + Math.random() * 3) * P);
-      for (let i = 0; i < nc; i++) {
-        const sp = 2 + Math.random() * 4, gv = 0.25 + Math.random() * 0.35;
-        this.chunks.emit({ x, y, z, vx: (nx + (Math.random() - 0.5) * 1.4) * sp, vy: 1 + Math.random() * 3.5, vz: (nz + (Math.random() - 0.5) * 1.4) * sp, s: 0.03 + Math.random() * 0.05, life: 5 + Math.random() * 4, color: (wood ? WOODC : CHIP)[(Math.random() * CHIP.length) | 0], sx: wood ? 2.5 : 1, sy: wood ? 0.5 : 1, bounce: 0.3 });
-        void gv;
-      }
-      for (let i = 0; i < 6; i++) this.debris.emit({ x, y, z, vx: nx * 3 + (Math.random() - 0.5) * 4, vy: 1 + Math.random() * 3.5, vz: nz * 3 + (Math.random() - 0.5) * 4, life: 0.8, s0: 0.04, c0: [0.42, 0.4, 0.36, 1], c1: [0.35, 0.33, 0.3, 0], grav: 14, bounce: 0.3, floor: 0.03 });
-    } else {
+    if (metal) {
       this.smoke.emit({ x, y, z, vx: nx, vy: 0.5, vz: nz, life: 0.6, s0: 0.15, s1: 0.7, c0: [0.4, 0.4, 0.42, 0.35], c1: [0.4, 0.4, 0.4, 0], drag: 3 });
-      if (Math.random() < 0.3 * P) this.scrap.emit({ x, y, z, vx: nx * 3 + (Math.random() - 0.5) * 2, vy: 2 + Math.random() * 2, vz: nz * 3 + (Math.random() - 0.5) * 2, s: 0.05, life: 5, color: 0x6a6660 });
+      for (let i = 0; i < 6; i++) { const d = cone(nx, ay, nz, 0.6), sp = 3 + Math.random() * 5; this.debris.emit({ x, y, z, vx: d[0] * sp, vy: d[1] * sp, vz: d[2] * sp, life: 0.9, s0: 0.035, c0: [0.5, 0.5, 0.5, 1], c1: [0.4, 0.4, 0.4, 0.6], grav: 14, bounce: 0.35, floor: 0.03 }); }
+      if (Math.random() < 0.3 * P) this.scrap.emit({ x, y, z, vx: nx * 3 + (Math.random() - 0.5) * 2, vy: 2 + Math.random() * 2, vz: nz * 3 + (Math.random() - 0.5) * 2, s: 0.05, life: 8, color: 0x6a6660 });
+      return;
+    }
+    // debris: 20-30 grit chunks thrown in a cone along the normal + a few persistent 3D chips
+    const pal = wood ? WOODC : CHIP, gc = ground ? [0.36, 0.32, 0.27] : wood ? [0.4, 0.27, 0.15] : [0.5, 0.48, 0.44];
+    const ng = Math.round((20 + Math.random() * 10) * (0.6 + P * 0.4));
+    for (let i = 0; i < ng; i++) {
+      const d = cone(nx, ay + 0.3, nz, 0.5), sp = 2 + Math.random() * 7, k = 0.75 + Math.random() * 0.5;
+      this.debris.emit({ x, y, z, vx: d[0] * sp, vy: d[1] * sp, vz: d[2] * sp, life: 0.7 + Math.random() * 0.8, s0: 0.03 + Math.random() * 0.05, c0: [gc[0] * k, gc[1] * k, gc[2] * k, 1], c1: [gc[0] * k, gc[1] * k, gc[2] * k, 0.5], grav: 15, bounce: 0.3, floor: 0.03, drag: 0.5 });
+    }
+    const nc = Math.round((2 + Math.random() * 3) * P);
+    for (let i = 0; i < nc; i++) {
+      const d = cone(nx, ay + 0.4, nz, 0.5), sp = 2 + Math.random() * 4;
+      this.chunks.emit({ x, y, z, vx: d[0] * sp, vy: d[1] * sp, vz: d[2] * sp, s: 0.03 + Math.random() * 0.05, life: 8 + Math.random() * 4, color: pal[(Math.random() * pal.length) | 0], sx: wood ? 2.5 : 1, sy: wood ? 0.5 : 1, bounce: 0.3 });
+    }
+    // dust jet: elongated puffs streaming out along the normal
+    for (let i = 0; i < (ground ? 4 : 5); i++) {
+      const d = cone(nx, ay * 0.6, nz, 0.3), sp = 1 + Math.random() * 3.2;
+      this.smoke.emit({ x, y, z, vx: d[0] * sp, vy: d[1] * sp + 0.2, vz: d[2] * sp, life: 0.8 + Math.random() * 0.8, s0: 0.18, s1: 0.9 + Math.random() * 0.5, c0: [0.6, 0.56, 0.5, 0.5], c1: [0.5, 0.48, 0.45, 0], drag: 3 });
     }
   }
 
-  // Flesh hit: exit spray in the bullet direction (mist + droplets + splat on the ground), small entry puff.
+  // Flesh hit: directional exit spray along the bullet (cone of droplets + bits), splats on the ground.
   bloodHit(x, y, z, bx, bz, B = BLOOD, power = 1) {
     const P = Math.min(2.5, power);
-    const nd = Math.round(16 * P);
+    const nd = Math.round(22 * Math.min(1.6, P));
     for (let i = 0; i < nd; i++) {
-      const sp = 2 + Math.random() * 5;
-      this.wet.emit({ x, y, z, vx: (bx + (Math.random() - 0.5) * 1.1) * sp, vy: (Math.random() - 0.1) * 3.2, vz: (bz + (Math.random() - 0.5) * 1.1) * sp, life: 0.5 + Math.random() * 0.4, s0: 0.14 + Math.random() * 0.16, s1: 0.06, c0: B.drop, c1: B.dropEnd, grav: 13, floor: 0.04, drag: 0.6 });
+      const d = cone(bx, 0.25, bz, 0.4), sp = 3 + Math.random() * 6;
+      this.wet.emit({ x, y, z, vx: d[0] * sp, vy: d[1] * sp, vz: d[2] * sp, life: 0.45 + Math.random() * 0.4, s0: 0.1 + Math.random() * 0.12, s1: 0.05, c0: B.drop, c1: B.dropEnd, grav: 13, floor: 0.04, drag: 0.6 });
     }
-    // mist cloud
-    for (let i = 0; i < 3; i++) this.wet.emit({ x: x + bx * 0.15, y, z: z + bz * 0.15, vx: bx * (1.5 + Math.random() * 2) + (Math.random() - 0.5), vy: Math.random() * 0.8, vz: bz * (1.5 + Math.random() * 2) + (Math.random() - 0.5), life: 0.35 + Math.random() * 0.25, s0: 0.5, s1: 1.7 + P * 0.45, c0: B.mist, c1: B.mistEnd, drag: 4 });
-    // bright wet glint + hot fragments (additive) so hits read against dark bodies at gameplay zoom
-    this.star.emit({ x, y, z, life: 0.07, s0: 1.3 + P * 0.35, s1: 0.4, c0: B.glint, c1: [0, 0, 0, 0] });
-    for (let i = 0; i < 6 + P * 3; i++) {
-      const sp = 5 + Math.random() * 9;
-      this.streaks.emit({ x, y, z, vx: (bx + (Math.random() - 0.5) * 1.6) * sp, vy: Math.random() * 3, vz: (bz + (Math.random() - 0.5) * 1.6) * sp, life: 0.15 + Math.random() * 0.2, trail: 0.03, w: 0.026, c0: B.spark, c1: [0.6, 0.05, 0.02, 0], grav: 10, drag: 2 });
+    // a tight spurt of mist right at the exit (small: no full-screen haze)
+    for (let i = 0; i < 2; i++) this.wet.emit({ x: x + bx * 0.2, y, z: z + bz * 0.2, vx: bx * (2 + Math.random() * 2), vy: Math.random() * 0.6, vz: bz * (2 + Math.random() * 2), life: 0.3, s0: 0.25, s1: 0.8 + P * 0.2, c0: B.mist, c1: B.mistEnd, drag: 5 });
+    // hot fragments: thin directional streaks
+    for (let i = 0; i < 4 + P * 2; i++) {
+      const d = cone(bx, 0.2, bz, 0.35), sp = 6 + Math.random() * 8;
+      this.streaks.emit({ x, y, z, vx: d[0] * sp, vy: d[1] * sp, vz: d[2] * sp, life: 0.12 + Math.random() * 0.15, trail: 0.03, w: 0.024, c0: B.spark, c1: [0.6, 0.05, 0.02, 0], grav: 10, drag: 2 });
     }
-    if (P > 1.2 && Math.random() < 0.5) this.gibs.emit({ x, y, z, vx: bx * 4 + (Math.random() - 0.5) * 2, vy: 2 + Math.random() * 3, vz: bz * 4 + (Math.random() - 0.5) * 2, s: 0.04 + Math.random() * 0.04, life: 8, color: B.gib[(Math.random() * B.gib.length) | 0], spin: 25, bounce: 0.2 });
+    const nb = P > 1.2 ? 3 : 1;
+    for (let i = 0; i < nb; i++) { const d = cone(bx, 0.5, bz, 0.4), sp = 3 + Math.random() * 3; this.gibs.emit({ x, y, z, vx: d[0] * sp, vy: d[1] * sp + 1, vz: d[2] * sp, s: 0.03 + Math.random() * 0.03, life: 12, color: B.gib[(Math.random() * B.gib.length) | 0], spin: 25, bounce: 0.2 }); }
     for (let i = 0; i < Math.max(1, Math.round(P * 1.5)); i++) {
       const d = 0.6 + Math.random() * 1.6 * P;
       this.splat(x + bx * d + (Math.random() - 0.5) * 0.5, z + bz * d + (Math.random() - 0.5) * 0.5, Math.atan2(bz, bx), 0.7 + Math.random() * 0.6 * P, B);
@@ -187,7 +212,7 @@ export class Effects {
   gore(x, z, bx, bz, kind = 'blood', gibs = 0, size = 1) {
     const B = kind === 'ichor' ? ICHOR : BLOOD;
     this.bloodHit(x, 1.1 * size, z, bx, bz, B, 2.5);
-    for (let i = 0; i < 4; i++) this.wet.emit({ x, y: 1 * size, z, vx: bx * 3 + (Math.random() - 0.5) * 3, vy: 1 + Math.random() * 2, vz: bz * 3 + (Math.random() - 0.5) * 3, life: 0.7, s0: 0.5, s1: 1.8 * size, c0: B.mist, c1: B.mistEnd, drag: 3 });
+    for (let i = 0; i < 2; i++) this.wet.emit({ x, y: 1 * size, z, vx: bx * 3 + (Math.random() - 0.5) * 2, vy: 0.5 + Math.random(), vz: bz * 3 + (Math.random() - 0.5) * 2, life: 0.5, s0: 0.4, s1: 1.0 * size, c0: B.mist, c1: B.mistEnd, drag: 4 });
     for (let i = 0; i < gibs; i++) {
       const sp = 3 + Math.random() * 6;
       this.gibs.emit({ x: x + (Math.random() - 0.5) * 0.4, y: 0.6 + Math.random() * 0.9 * size, z: z + (Math.random() - 0.5) * 0.4,
@@ -199,17 +224,16 @@ export class Effects {
   }
   // The kill moment: white-hot star, radial ring of sparks in the faction colour, shock puff and a light pop.
   killBurst(x, y, z, bx, bz, type = 'raider', size = 1) {
-    const C = { raider: [5, 1.4, 0.5, 1], mutant: [2.6, 4, 0.6, 1], brute: [5, 2.4, 0.6, 1] }[type] || [5, 2, 1, 1];
-    this.star.emit({ x, y, z, life: 0.1, s0: 2.6 * size, s1: 1.0 * size, c0: [5, 4.6, 4.2, 1], c1: [C[0] * 0.4, C[1] * 0.4, C[2] * 0.4, 0] });
-    this.add.emit({ x, y, z, life: 0.18, s0: 1.6 * size, s1: 2.8 * size, c0: [C[0] * 0.3, C[1] * 0.3, C[2] * 0.3, 0.8], c1: [C[0] * 0.2, C[1] * 0.2, C[2] * 0.2, 0] });
-    const n = Math.round(26 * size);
-    for (let i = 0; i < n; i++) {
-      const a = Math.random() * 6.283, sp = 6 + Math.random() * 12;
-      const vx = Math.cos(a) * sp * 0.7 + bx * sp * 0.6, vz = Math.sin(a) * sp * 0.7 + bz * sp * 0.6;
-      this.streaks.emit({ x, y, z, vx, vy: 1 + Math.random() * 6, vz, life: 0.25 + Math.random() * 0.4, trail: 0.03, w: 0.03, c0: i % 3 ? C : [6, 5, 4, 1], c1: [C[0] * 0.2, C[1] * 0.1, C[2] * 0.05, 0], grav: 12, drag: 1.5, bounce: 0.4 });
-    }
-    for (let i = 0; i < 8; i++) { const a = (i / 8) * 6.283; this.smoke.emit({ x, y: 0.4, z, vx: Math.cos(a) * 3.5, vy: 0.3, vz: Math.sin(a) * 3.5, life: 0.7, s0: 0.5, s1: 1.6 * size, c0: [0.5, 0.46, 0.42, 0.35], c1: [0.4, 0.4, 0.4, 0], drag: 4 }); }
-    this.flashLight(x, y + 0.6, z, type === 'mutant' ? 0x9aff40 : 0xff7a30, 55 * size, 9 * size, 0.16);
+    const B = type === 'mutant' ? ICHOR : BLOOD;
+    const C = type === 'mutant' ? [2.6, 3.4, 0.6, 1] : [5, 1.8, 0.5, 1];
+    this.star.emit({ x, y, z, life: 0.06, s0: 0.9 * size, s1: 0.4, c0: [5, 4.6, 4.2, 1], c1: [C[0] * 0.3, C[1] * 0.3, C[2] * 0.3, 0] });
+    // big directional gore cone + bits flying out the back
+    for (let i = 0; i < 40 * size; i++) { const d = cone(bx, 0.35, bz, 0.55), sp = 3 + Math.random() * 8; this.wet.emit({ x, y, z, vx: d[0] * sp, vy: d[1] * sp, vz: d[2] * sp, life: 0.5 + Math.random() * 0.5, s0: 0.12 + Math.random() * 0.16, s1: 0.06, c0: B.drop, c1: B.dropEnd, grav: 13, floor: 0.04, drag: 0.5 }); }
+    for (let i = 0; i < 6 * size; i++) { const d = cone(bx, 0.6, bz, 0.6), sp = 3 + Math.random() * 5; this.gibs.emit({ x, y, z, vx: d[0] * sp, vy: d[1] * sp + 1, vz: d[2] * sp, s: (0.04 + Math.random() * 0.06) * size, sx: 1 + Math.random(), life: 14, color: B.gib[(Math.random() * B.gib.length) | 0], spin: 25, bounce: 0.2, onLand: (q) => this.splat(q.x, q.z, Math.atan2(q.vz, q.vx), 0.4 + Math.random() * 0.3, B) }); }
+    for (let i = 0; i < 14; i++) { const d = cone(bx, 0.4, bz, 0.6), sp = 7 + Math.random() * 10; this.streaks.emit({ x, y, z, vx: d[0] * sp, vy: d[1] * sp, vz: d[2] * sp, life: 0.15 + Math.random() * 0.25, trail: 0.03, w: 0.03, c0: C, c1: [C[0] * 0.2, C[1] * 0.1, C[2] * 0.05, 0], grav: 12, drag: 1.5, bounce: 0.4 }); }
+    // ground shock: dust kicked out around the feet
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * 6.283; this.smoke.emit({ x, y: 0.3, z, vx: Math.cos(a) * 2.5 + bx * 2, vy: 0.3, vz: Math.sin(a) * 2.5 + bz * 2, life: 0.8, s0: 0.4, s1: 1.2 * size, c0: [0.5, 0.46, 0.42, 0.35], c1: [0.4, 0.4, 0.4, 0], drag: 4 }); }
+    this.flashLight(x, y + 0.5, z, type === 'mutant' ? 0x9aff40 : 0xff7a30, 18 * size, 6 * size, 0.1);
   }
   // bright pop where loot lands
   lootPop(x, z, color = [3, 2.6, 1.6]) {
@@ -327,14 +351,18 @@ function mergeTwo(a, b) { return mergeGeometries([a, b], false); }
 function flashTexture() { return T.softSprite('flash', 1, 0); }
 
 // gore palettes (linear colours; droplets are unlit sprites so keep them saturated enough to read)
-const BLOOD = { drop: [0.85, 0.05, 0.03, 1], dropEnd: [0.45, 0.02, 0.01, 0.9], mist: [0.6, 0.05, 0.04, 0.6], mistEnd: [0.25, 0.01, 0.01, 0], glint: [2.4, 0.35, 0.15, 1], spark: [4, 0.9, 0.3, 1], gib: [0x7a1410, 0x5a0c0a, 0x8a2a20, 0x9a7a6a] };
-const ICHOR = { drop: [0.38, 0.45, 0.05, 1], dropEnd: [0.18, 0.22, 0.02, 0.9], mist: [0.3, 0.38, 0.06, 0.5], mistEnd: [0.15, 0.2, 0.02, 0], glint: [1.4, 1.9, 0.2, 1], spark: [2.4, 3, 0.5, 1], gib: [0x4a5a14, 0x3a3a10, 0x6a7a2a, 0x8a8a6a] };
-const BULLETS = {
-  rifle: { speed: 240, trail: 0.009, w: 0.032, c: [5, 3.2, 1.3, 1], core: [6, 5.5, 4.5, 1] },
-  smg: { speed: 230, trail: 0.006, w: 0.026, c: [5, 2.8, 1.1, 1], core: [6, 5, 4, 1] },
-  shotgun: { speed: 170, trail: 0.0055, w: 0.03, c: [5, 2.2, 0.7, 1] },
-  dmr: { speed: 320, trail: 0.014, w: 0.085, c: [4, 3.4, 2.6, 1], core: [8, 8, 7, 1] },
-  enemy: { speed: 0, trail: 0, w: 0, c: [0, 0, 0, 0] },
+const BLOOD = { drop: [0.85, 0.05, 0.03, 1], dropEnd: [0.45, 0.02, 0.01, 0.9], mist: [0.6, 0.05, 0.04, 0.45], mistEnd: [0.25, 0.01, 0.01, 0], glint: [2.4, 0.35, 0.15, 1], spark: [4, 0.9, 0.3, 1], gib: [0x7a1410, 0x5a0c0a, 0x8a2a20, 0x9a7a6a] };
+const ICHOR = { drop: [0.38, 0.45, 0.05, 1], dropEnd: [0.18, 0.22, 0.02, 0.9], mist: [0.3, 0.38, 0.06, 0.35], mistEnd: [0.15, 0.2, 0.02, 0], glint: [1.4, 1.9, 0.2, 1], spark: [2.4, 3, 0.5, 1], gib: [0x4a5a14, 0x3a3a10, 0x6a7a2a, 0x8a8a6a] };
+const BULLETS = { // speed m/s, tail seconds, width m (~0.09m = 3-4px at gameplay zoom), HDR colours
+  rifle: { speed: 150, tail: 0.1, w: 0.085, c: [4.5, 2.6, 0.9, 1], c1: [3, 1.2, 0.3, 0.8], core: [6, 5.2, 3.8, 1] },
+  smg: { speed: 140, tail: 0.07, w: 0.07, c: [4.5, 2.3, 0.8, 1], c1: [3, 1, 0.25, 0.8], core: [6, 5, 3.5, 1] },
+  shotgun: { speed: 110, tail: 0.06, w: 0.07, c: [5, 2, 0.5, 1], c1: [2.5, 0.6, 0.1, 0.6] },
+  dmr: { speed: 220, tail: 0.1, w: 0.16, c: [3.5, 3.2, 2.8, 1], c1: [2.5, 1.6, 0.8, 0.8], core: [8, 8, 7.5, 1] },
 };
+// random unit vector in a cone around (ax, ay, az) (not normalised input), half-angle ~spread*90deg
+function cone(ax, ay, az, spread) {
+  let x = ax + (Math.random() - 0.5) * 2 * spread, y = ay + (Math.random() - 0.5) * 2 * spread, z = az + (Math.random() - 0.5) * 2 * spread;
+  const l = Math.hypot(x, y, z) || 1; return [x / l, y / l, z / l];
+}
 const CHIP = [0x6a6660, 0x5a5650, 0x7a746a, 0x4a4640, 0x807a70];
 const WOODC = [0x5a3a20, 0x6a4628, 0x4a2e18, 0x7a5432, 0x3a2414];
