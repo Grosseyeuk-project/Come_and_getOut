@@ -860,7 +860,11 @@ export class Environment {
       for (let a = a0 + 2; a < a1 - 2; a += 4.5) { const [dx, dz] = at(a, 0); this.decals.push({ kind: 'dash', x: dx, z: dz, s: 2.2, sx: 0.6, rot: ry - Math.PI / 2, y: top + 0.04 }); }
       for (let a = a0 + 3; a < a1 - 3; a += rng.range(4, 9)) { const [dx, dz] = at(a, rng.range(-o.w / 2, o.w / 2)); this.decals.push({ kind: rng.pick(['crack', 'oil', 'wet', 'stain', 'paper', 'leaves']), x: dx, z: dz, s: rng.range(2, 4), rot: rng.range(0, 6), y: top + 0.04 }); }
     };
-    deck(-E, gapA); deck(gapB, E);
+    // standing spans: beyond the border (seals the edge) and one span leading into the break; the rest of
+    // the in-map deck has fallen, leaving pillar stumps and slabs on the road (no wall of occluding concrete)
+    const spans = [[-E, -HALF + 2], [HALF - 2, E], [gapA - 15, gapA]];
+    for (const [a0, a1] of spans) deck(a0, a1);
+    const standing = (a) => spans.some(([a0, a1]) => a >= a0 - 1 && a <= a1 + 1);
     // collapsed span: one end on the deck lip, the other smashed into the road
     {
       const len = Math.hypot(gapB - gapA, top), ang = Math.atan2(top - 0.4, gapB - gapA);
@@ -872,6 +876,16 @@ export class Environment {
     // supports
     for (let a = -E + 6; a < E - 4; a += 14) {
       if (a > gapA - 2 && a < gapB + 2) continue;
+      if (!standing(a)) { // broken pillar stumps + a fallen deck slab
+        for (const sd of [-1, 1]) {
+          const [x, z] = at(a, sd * (o.w / 2 - 0.7)), h = rng.range(1.5, 5);
+          this.addBox(M.slab, x, h / 2, z, 0.9, h, 0.9, 0, 0x8e8a82, 0.33, 0, 0, Math.min(1, h * 0.3), true);
+          for (let i = 0; i < 4; i++) this.rebar.add(x + rng.range(-0.3, 0.3), h + 0.3, z + rng.range(-0.3, 0.3), [1.5, rng.range(0.6, 1.6), 1.5], rng.range(-0.4, 0.4), 0, rng.range(-0.4, 0.4));
+          if (Math.abs(x) < HALF && Math.abs(z) < HALF) this.col.add(x, z, 0.45, 0.45, 0, h, { kind: 'pole' });
+        }
+        if (rng.chance(0.7)) { const [x, z] = at(a + 7, rng.range(-o.w / 4, o.w / 4)); const L2 = rng.range(5, 8); this.place([{ mat: M.slab, geo: colorize(K.box(L2, 0.9, DW * 0.6, 0, 0, 0).toNonIndexed(), 0x86827a) }], x, 0.6, z, ry + rng.range(-0.4, 0.4), 1, rng.range(-0.12, 0.12), rng.range(-0.15, 0.15)); if (Math.abs(x) < HALF && Math.abs(z) < HALF) this.col.add(x, z, L2 * 0.4, DW * 0.25, ry, 1.1, { kind: 'cover' }); for (let i = 0; i < 20; i++) this.rubble.add(x + rng.range(-4, 4), 0.03, z + rng.range(-4, 4), rng.range(0.1, 0.4), rng.range(0, 3), rng.range(0, 3), 0); }
+        continue;
+      }
       for (const sd of [-1, 1]) {
         const [x, z] = at(a, sd * (o.w / 2 - 0.7));
         this.addBox(M.slab, x, (top - th) / 2, z, 0.9, top - th, 0.9, 0, 0x8e8a82, 0.33, 0, 0, 0, true);
@@ -885,6 +899,7 @@ export class Environment {
     // stuff up on the deck: wrecks, lamps, debris (seen from the camera, layering the street)
     for (let a = -E + 8; a < E - 8; a += rng.range(7, 13)) {
       if (a > gapA - 3 && a < gapB + 3) continue;
+      if (!standing(a)) continue;
       const k = rng.next(), [x, z] = at(a, rng.range(-o.w / 2 + 1.2, o.w / 2 - 1.2));
       if (k < 0.4) this.place(P.carParts(rng.weighted([[0, 3], [3, 2], [1, 2], [4, 1], [5, 0.5]]), rng.int(0, 8), rng.chance(0.4)), x, top + 0.05, z, ry + rng.range(-0.3, 0.3) + (rng.chance(0.5) ? Math.PI : 0));
       else if (k < 0.55) { const [lx, lz] = at(a, (rng.chance(0.5) ? 1 : -1) * (DW / 2 - 0.4)); const w2 = rng.chance(0.4); this.place(P.lampParts(rng.chance(0.3), w2), lx, top, lz, ry + (lz > o.c || lx > o.c ? Math.PI : 0) + Math.PI / 2); if (w2) this.lighting.addSource(new THREE.Vector3(lx, top + 5.8, lz), 0xffa855, 40, 14, 'lamp', { priority: 0.8 }); }
