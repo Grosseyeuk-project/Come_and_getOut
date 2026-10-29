@@ -15,7 +15,7 @@ const UP_NEG = new V(0, -1, 0);
 const _v1 = new V(), _v2 = new V(), _v3 = new V(), _v4 = new V(), _q = new THREE.Quaternion();
 
 const KINDS = {
-  player: { cloth: 0x2e3238, pants: 0x24272b, vest: 0x1c1e22, plate: 0x4a525a, skin: 0xa07e66, boots: 0x1a1714, gloves: 0x18191a, accent: 0x38d8ff, eye: 0x38d8ff, scale: 1.22, rim: [0.06, 0.14, 0.22] },
+  player: { cloth: 0x8a867e, pants: 0x4e4b46, vest: 0x3a3834, plate: 0xa9a59d, skin: 0xa07e66, boots: 0x2a2622, gloves: 0x3a3632, accent: 0xff9a3a, eye: 0xffb060, scale: 1.22, rim: [0.18, 0.16, 0.12] },
   raider: { cloth: 0x5a2a18, pants: 0x3a3226, vest: 0x2e241c, plate: 0x6a4a2e, skin: 0x8a6a56, boots: 0x1c1712, gloves: 0x2a1d14, accent: 0xff3a14, eye: 0xff2a10, scale: 1.14, rim: [0.6, 0.15, 0.06] },
   mutant: { cloth: 0x2e2a22, pants: 0x2b2820, vest: 0x2a2620, plate: 0x3a3a30, skin: 0x8a9478, boots: 0x3b382e, gloves: 0x7a8468, accent: 0xb4ff3a, eye: 0xd4ff30, scale: 1.12, rim: [0.4, 0.75, 0.1] },
   brute: { cloth: 0x2a221c, pants: 0x2a221c, vest: 0x3a2a20, plate: 0x6a6258, skin: 0x7a6252, boots: 0x2a2018, gloves: 0x3a3430, accent: 0xff6a1a, eye: 0xff8a20, scale: 1.72, rim: [0.6, 0.28, 0.06] },
@@ -38,7 +38,7 @@ export class Humanoid {
       skin: new THREE.MeshStandardMaterial({ color: K.skin, roughness: 0.6 }),
       boots: new THREE.MeshStandardMaterial({ color: K.boots, roughness: 0.6 }),
       gloves: new THREE.MeshStandardMaterial({ color: K.gloves, roughness: 0.7 }),
-      accent: new THREE.MeshStandardMaterial({ color: 0x000000, emissive: K.accent, emissiveIntensity: kind === 'mutant' ? 2.6 : kind === 'player' ? 1.5 : 3.5 }),
+      accent: new THREE.MeshStandardMaterial({ color: 0x000000, emissive: K.accent, emissiveIntensity: kind === 'mutant' ? 2.6 : kind === 'player' ? 1.4 : 3.5 }),
       eye: new THREE.MeshStandardMaterial({ color: 0x000000, emissive: K.eye, emissiveIntensity: 6 }),
       bone: new THREE.MeshStandardMaterial({ color: 0xc8bca0, roughness: 0.6 }),
       rust: new THREE.MeshStandardMaterial({ color: 0x5a3a26, roughness: 0.8, metalness: 0.4 }),
@@ -303,8 +303,20 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
     this.root.add(mesh); mesh.updateMatrixWorld(true);
     mesh.bind(new THREE.Skeleton(bones), mesh.matrixWorld);
     mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 1, 0), 2.2); // cheap culling bound (animated)
+    if (this.kind === 'player') this.addSilhouette(merged, mesh.skeleton);
     for (const k of Object.keys(this.mats)) this.mats[k].dispose();
     this.allMats = [this.bodyMat];
+  }
+
+  // Hero-only readability: an inverted-hull outline drawn after the VFX so it stays visible through sparks/smoke.
+  addSilhouette(geo, skeleton) {
+    const hull = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.86, 0.6), side: THREE.BackSide, transparent: true, opacity: 0.6, depthWrite: false, fog: false });
+    hull.onBeforeCompile = (sh) => { sh.vertexShader = sh.vertexShader.replace('#include <skinning_vertex>', '#include <skinning_vertex>\ntransformed += normalize(objectNormal) * 0.035;'); };
+    hull.customProgramCacheKey = () => 'hero-hull';
+    for (const [mat, order] of [[hull, 9]]) { // (an x-ray fill self-occludes without a stencil buffer; walls are cut out instead)
+      const m = new THREE.SkinnedMesh(geo, mat); m.bind(skeleton, this.skin.bindMatrix); m.renderOrder = order; m.frustumCulled = false;
+      this.root.add(m); (this.silhouette = this.silhouette || []).push(m);
+    }
   }
 
   setWeapon(model) {
@@ -535,5 +547,5 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
     }
     if (this.headless > 0) this.headless -= dt;
   }
-  dispose() { this.root.traverse((o) => { if (o.isMesh && !o.userData.shared) o.geometry.dispose(); }); this.bodyMat.dispose(); if (this.skin) this.skin.skeleton.dispose(); }
+  dispose() { if (this.silhouette) for (const m of this.silhouette) m.material.dispose(); this.root.traverse((o) => { if (o.isMesh && !o.userData.shared) o.geometry.dispose(); }); this.bodyMat.dispose(); if (this.skin) this.skin.skeleton.dispose(); }
 }

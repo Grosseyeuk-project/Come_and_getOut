@@ -217,9 +217,9 @@ export class Game {
     const ex = this.extraction, rng = this.waveRng || (this.waveRng = new RNG(this.seed ^ 0x3a3a));
     const alive = this.enemies.alive.filter((e) => e.group === 'wave').length;
     n = Math.min(n, 34 - alive); if (n <= 0) return;
-    const dirs = [rng.range(0, 6.28)]; if (this.extractT > 6) dirs.push(dirs[0] + rng.range(1.6, 4.6));
+    const dirs = [(rng.range(0, 1) < 0.5 ? -0.785 : 2.356) + rng.range(-0.5, 0.5)]; if (this.extractT > 6) dirs.push(dirs[0] + Math.PI + rng.range(-0.5, 0.5)); // screen left/right edges
     for (let i = 0; i < n; i++) {
-      const a = dirs[i % dirs.length] + rng.range(-0.45, 0.45), r = rng.range(17, 26);
+      const a = dirs[i % dirs.length] + rng.range(-0.6, 0.6), r = rng.range(11, 16); // close enough to burst onto the screen
       const p = this.nav.nearestWalkable(ex.x + Math.cos(a) * r, ex.z + Math.sin(a) * r, 6);
       if (!p || !this.nav.isReachable(p.x, p.z)) continue;
       const type = i === 0 && this.extractT > 8 ? 'brute' : rng.weighted([['mutant', 8], ['raider', 2]]);

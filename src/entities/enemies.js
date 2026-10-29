@@ -84,7 +84,8 @@ export class EnemyManager {
     const ok = (info.overkill || 0) + (info.dmg || 0) * ((info.power || 1) - 1);
     const shot = g.combat.shot && g.combat.shot.get(e);
     const pellets = shot ? shot.n : 1;
-    const gib = !brute && (pellets >= 6 || ok > e.maxHp * 0.55 || (info.power >= 1.8 && Math.random() < 0.5));
+    const close = Math.hypot(e.pos.x - g.player.pos.x, e.pos.z - g.player.pos.z) < 5.5;
+    const gib = !brute && shot && g.player.weapon.stats.pellets > 1 && close && pellets >= 4; // only point-blank shotgun blasts gib; DMR kills leave a body
     const push = brute ? 2.2 : 5 + pellets * 1.1 + (info.power || 1) * 2;
     e.hum.die(dx, dz, { push, gib, kind: e.type, headshot: !gib && Math.random() < 0.25 });
     g.fx.gore(e.pos.x, e.pos.z, dx, dz, blood, gib ? 14 : brute ? 6 : 3, sc);
@@ -257,7 +258,14 @@ export class EnemyManager {
         } else if (dist < def.reach && e.sees && e.atkCd <= 0) {
           e.atkT = 0;
         } else {
-          const t = e.sees && dist < 12 ? toward(pl.pos.x, pl.pos.z) : pathTo(pl.pos.x, pl.pos.z, true);
+          let t = e.sees && dist < 12 ? toward(pl.pos.x, pl.pos.z) : pathTo(pl.pos.x, pl.pos.z, true);
+          // surround: close in on a personal slot around the player instead of everyone piling on one point
+          if (e.sees && dist < 8) {
+            if (e.slot === undefined) e.slot = Math.random() * 6.283;
+            const a = Math.atan2(e.pos.z - pl.pos.z, e.pos.x - pl.pos.x); let da = e.slot - a; da = Math.atan2(Math.sin(da), Math.cos(da));
+            const ta = a + Math.max(-0.8, Math.min(0.8, da)), rr = def.reach * 0.8;
+            t = toward(pl.pos.x + Math.cos(ta) * rr, pl.pos.z + Math.sin(ta) * rr);
+          }
           mvx = t.x; mvz = t.z; speed = def.speed;
           if (e.type === 'mutant' && e.sees && dist > 3) { e.zig += dt * 5; const z = Math.sin(e.zig) * 0.6; const px = -mvz, pz = mvx; mvx += px * z; mvz += pz * z; }
         }
@@ -265,8 +273,8 @@ export class EnemyManager {
       // separation from other enemies
       for (const o of this.list) {
         if (o === e || o.dead) continue;
-        const sx = e.pos.x - o.pos.x, sz = e.pos.z - o.pos.z, d2 = sx * sx + sz * sz, rr = e.radius + o.radius + 0.2;
-        if (d2 < rr * rr && d2 > 1e-4) { const d = Math.sqrt(d2); mvx += (sx / d) * (rr - d) * 2; mvz += (sz / d) * (rr - d) * 2; }
+        const sx = e.pos.x - o.pos.x, sz = e.pos.z - o.pos.z, d2 = sx * sx + sz * sz, rr = e.radius + o.radius + 0.35;
+        if (d2 < rr * rr && d2 > 1e-4) { const d = Math.sqrt(d2); mvx += (sx / d) * (rr - d) * 4; mvz += (sz / d) * (rr - d) * 4; }
       }
       const ml = Math.hypot(mvx, mvz); if (ml > 1) { mvx /= ml; mvz /= ml; }
       const sp = speed * (e.stagger > 0 ? 0.2 : 1);

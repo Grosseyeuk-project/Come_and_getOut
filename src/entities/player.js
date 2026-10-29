@@ -34,6 +34,8 @@ export class Player {
     spot.position.set(0, 1.6, 0); spot.castShadow = false;
     this.spotTarget = new THREE.Object3D(); game.scene.add(this.spotTarget); spot.target = this.spotTarget;
     game.scene.add(spot);
+    // soft warm-neutral key/fill that rides with the hero so he reads as a pale figure on dark asphalt
+    this.fill = new THREE.PointLight(0xffe6c8, 1.8, 5, 1.8); this.fill.castShadow = false; game.scene.add(this.fill);
     this.dead = false;
     // ground ring + aim chevron (readability on dark asphalt, The Ascent-style)
     const rg = new THREE.PlaneGeometry(1.9, 1.9); rg.rotateX(-Math.PI / 2);
@@ -166,7 +168,10 @@ export class Player {
     this.ring.rotation.y = Math.atan2(-(aimPoint.z - this.pos.z), aimPoint.x - this.pos.x);
     this.ringMat.opacity = (this.rollT >= 0 ? 1 : 0.7) * (this.invuln > 0 ? 1 : 0.85);
     // flashlight
-    this.spot.position.set(this.pos.x + Math.sin(this.face) * 0.3, 1.7, this.pos.z + Math.cos(this.face) * 0.3);
+    // flashlight sits ahead of the body (never lights the hero's own back/helmet) and dims while rolling
+    this.spot.position.set(this.pos.x + Math.sin(this.face) * 0.75, 2.1, this.pos.z + Math.cos(this.face) * 0.75);
+    this.spot.intensity = damp(this.spot.intensity, this.rollT >= 0 ? 0 : 55, 18, dt);
+    this.fill.position.set(this.pos.x + 1.2, this.y + 3.2, this.pos.z + 1.6); // camera side, above
     this.spotTarget.position.set(this.pos.x + Math.sin(this.face) * 10, 0, this.pos.z + Math.cos(this.face) * 10);
   }
   reload() {
@@ -181,5 +186,5 @@ export class Player {
     this.medkits--; this.healT = 1.4; this.healLeft = 50;
     this.game.audio.play('pickup', null, { tier: 1 }); this.game.hud.dirty();
   }
-  dispose() { this.game.scene.remove(this.ring); this.ringMat.dispose(); this.game.scene.remove(this.root); this.game.scene.remove(this.spot); this.game.scene.remove(this.spotTarget); this.hum.dispose(); }
+  dispose() { this.game.scene.remove(this.ring); this.ringMat.dispose(); this.game.scene.remove(this.root); this.game.scene.remove(this.spot); this.game.scene.remove(this.fill); this.game.scene.remove(this.spotTarget); this.hum.dispose(); }
 }
