@@ -250,3 +250,52 @@ export class Shafts {
   }
   update(dt, focus) { this.u.uTime.value += dt; this.u.uFocus.value.set(focus.x, 0, focus.z); }
 }
+
+// Accent neon: saturated tube fixtures on road-facing ground-floor facades, in the palette's two clashing accent
+// colours, each paired with a real light source (pooled light, in-scatter halo, SSR/streak reflections).
+// Guarantees 2-3 strong coloured focal lights per screen against the ambient colour. One draw call.
+export function buildAccents(lighting, env, layout, rng) {
+  const p = lighting.p, acc = p.accents; if (!acc || !layout || !layout.buildings) return null;
+  const roads = layout.roads || [];
+  const facesRoad = (mx, mz) => roads.some((r) => (r.axis === 'z' ? Math.abs(mx - r.x) < r.w / 2 + 3.5 : Math.abs(mz - r.z) < r.w / 2 + 3.5));
+  const signs = (env && env.signs) || [];
+  const nearSign = (x, z) => signs.some((s) => Math.abs(s.pos.x - x) < 3 && Math.abs(s.pos.z - z) < 3);
+  const pos = [], col = [], idx = []; let nv = 0;
+  const box = (cx, cy, cz, sx, sy, sz, c) => {
+    for (let k = 0; k < 8; k++) { pos.push(cx + (k & 1 ? sx : -sx) / 2, cy + (k & 2 ? sy : -sy) / 2, cz + (k & 4 ? sz : -sz) / 2); col.push(c.r, c.g, c.b); }
+    const f = [0, 1, 3, 0, 3, 2, 4, 6, 7, 4, 7, 5, 0, 4, 5, 0, 5, 1, 2, 3, 7, 2, 7, 6, 0, 2, 6, 0, 6, 4, 1, 5, 7, 1, 7, 3];
+    for (const i of f) idx.push(nv + i); nv += 8;
+  };
+  let count = 0; const near = [];
+  for (const b of layout.buildings) {
+    if (b.collapsed || b.damage > 0.8) continue;
+    const sides = [[b.x0, b.z0, b.x1, b.z0, 0, -1], [b.x1, b.z0, b.x1, b.z1, 1, 0], [b.x1, b.z1, b.x0, b.z1, 0, 1], [b.x0, b.z1, b.x0, b.z0, -1, 0]];
+    for (const [ax, az, bx, bz, nx, nz] of sides) {
+      const len = Math.hypot(bx - ax, bz - az); if (len < 4) continue;
+      const mx = (ax + bx) / 2 + nx * 4, mz = (az + bz) / 2 + nz * 4;
+      if (nx < 0 || nz < 0 || !facesRoad(mx, mz)) continue; // only facades the iso camera can see
+      const nfix = len > 14 ? 2 : 1;
+      for (let fi = 0; fi < nfix; fi++) {
+      if (!rng.chance(p.accentDensity ?? 0.4)) continue;
+      const seg = (len - 2.4) / nfix, t = 1.2 + seg * fi + rng.range(0, seg), ux = (bx - ax) / len, uz = (bz - az) / len;
+      const x = ax + ux * t + nx * 0.09, z = az + uz * t + nz * 0.09;
+      if (nearSign(x, z) || near.some(([qx, qz]) => Math.hypot(qx - x, qz - z) < 5)) continue;
+      near.push([x, z]);
+      let r = rng.next(), hex = acc[0][0]; for (const [h, w] of acc) { if (r < w) { hex = h; break; } r -= w; }
+      const c = new THREE.Color(hex), hc = c.clone().multiplyScalar(9);
+      const vertical = rng.chance(0.35), L = vertical ? rng.range(1.2, 2.0) : rng.range(1.3, 2.6), y = vertical ? rng.range(2.2, 3.2) : rng.range(2.6, 3.3);
+      const ex = Math.abs(ux) > 0.5;
+      if (vertical) box(x, y, z, 0.11, L, 0.11, hc);
+      else { box(x, y, z, ex ? L : 0.1, 0.1, ex ? 0.1 : L, hc); if (rng.chance(0.5)) box(x, y - 0.26, z, ex ? L * 0.7 : 0.08, 0.07, ex ? 0.08 : L * 0.7, hc); }
+      lighting.addSource(new THREE.Vector3(x + nx * 0.7, y - (vertical ? 0.3 : 0.1), z + nz * 0.7), c, 26, 11, rng.chance(0.2) ? 'lamp' : 'steady', { priority: 1.2, accent: true });
+      count++;
+      }
+    }
+  }
+  if (!count) return null;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
+  lighting.scene.add(m);
+  return m;
+}

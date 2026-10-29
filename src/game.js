@@ -61,6 +61,7 @@ export class Game {
     this.lighting = new Lighting(scene, this.renderer.renderer, this.layout.palette, this.renderer.quality);
     this.col = new CollisionWorld(-HALF, -HALF, HALF, HALF, 4);
     this.env = new Environment(scene, this.layout, this.col, this.lighting);
+    if (this.lighting.dress) this.lighting.dress(this.env, this.layout); // lighting hook: palette accent neon
     this.nav = new NavGrid(this.col, 1, 0.45);
     const pop = this.pop = populate(this.layout, this.nav, new RNG(this.seed ^ 0xbeef));
     this.fx = new Effects(scene, this.lighting, this.renderer);

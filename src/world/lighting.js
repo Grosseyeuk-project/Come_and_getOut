@@ -7,7 +7,8 @@
 import * as THREE from 'three';
 import { vnoise } from '../core/rng.js';
 import { atmo } from '../render/atmosphere.js';
-import { LightFx, Rain, Shafts } from './lightingFx.js';
+import { LightFx, Rain, Shafts, buildAccents } from './lightingFx.js';
+import { RNG } from '../core/rng.js';
 
 const C3 = (h) => { const c = new THREE.Color(h); return { r: c.r, g: c.g, b: c.b }; };
 
@@ -15,31 +16,31 @@ const C3 = (h) => { const c = new THREE.Color(h); return { r: c.r, g: c.g, b: c.
 export const PALETTES = {
   dusk: {
     name: 'Burning Dusk', fog: 0x1a1a20, fogD: 0.012, haze: 0x40343a, fogH: [0.15, 0.05], scatter: 0.0009, mist: [0.42, 0.36, 0.34], embers: 1.0, ash: 0,
-    sun: 0xff9c60, sunI: 2.5, sunDir: [-0.6, 0.62, -0.45], hemiS: 0x3a6070, hemiG: 0x1c140f, hemiI: 0.85,
+    sun: 0xff9c60, sunI: 2.4, sunDir: [-0.6, 0.62, -0.45], hemiS: 0x2e6a84, hemiG: 0x1c140f, hemiI: 0.85,
     sky: [0x0a0c10, 0x24303a, 0x8a5a48], glows: [[0xff7a30, 1.8, -0.6, 0.15, -0.45], [0x30d0ff, 1.1, 0.7, 0.45, 0.3], [0x30d0ff, 0.9, -0.7, 0.6, 0.9], [0xff4020, 0.8, 0.9, 0.25, -0.8]], envI: 0.55,
-    lamps: [[0xff9440, 0.65], [0x7fe8ff, 0.35]], flood: 0xbfefff, wet: 0.35, puddle: 0.62, rain: 0, shafts: 0.05, rim: 0x5cc8ff, rimI: 0.55,
+    lamps: [[0xff9440, 0.55], [0x7fe8ff, 0.45]], flood: 0xbfefff, accents: [[0x20e0ff, 0.6], [0xff2a78, 0.3], [0xffa020, 0.1]], accentDensity: 0.75, wet: 0.35, puddle: 0.62, rain: 0, shafts: 0.05, rim: 0x5cc8ff, rimI: 0.55,
     tint: [1.06, 0.98, 0.88], shadowTint: [0.82, 0.99, 1.12], exposure: 1.05, contrast: 1.18, sat: 0.92, warmSat: 0.3, lift: [0.006, 0.009, 0.012], lampScale: 1,
   },
   night: {
-    name: 'Dead Night', fog: 0x0a1016, fogD: 0.012, haze: 0x1c3038, fogH: [0.14, 0.06], scatter: 0.0012, mist: [0.24, 0.32, 0.38], embers: 0.3, ash: 0,
-    sun: 0x86b8f0, sunI: 1.35, sunDir: [0.42, 0.85, -0.5], hemiS: 0x2c5a6c, hemiG: 0x0c0e12, hemiI: 1.05,
+    name: 'Dead Night', fog: 0x0a1016, fogD: 0.012, haze: 0x1a2840, fogH: [0.14, 0.06], scatter: 0.0012, mist: [0.24, 0.32, 0.38], embers: 0.3, ash: 0,
+    sun: 0x86b8f0, sunI: 1.35, sunDir: [0.42, 0.85, -0.5], hemiS: 0x24406c, hemiG: 0x0c0c14, hemiI: 1.0,
     sky: [0x05070a, 0x102028, 0x1c3a48], glows: [[0x20e0ff, 2.2, -0.65, 0.5, -0.6], [0xff8a30, 1.6, -0.3, 0.3, -0.9], [0xff2a70, 1.2, -0.9, 0.55, 0.1], [0x30f0c0, 1.0, 0.6, 0.4, 0.6]], envI: 0.65,
-    lamps: [[0xff8a30, 0.55], [0x70f0e0, 0.45]], flood: 0xa8f0ff, wet: 0.95, puddle: 0.5, rain: 1, shafts: 0.025, rim: 0x48d8ff, rimI: 0.75,
-    tint: [1.04, 0.99, 0.92], shadowTint: [0.78, 1.0, 1.16], exposure: 1.25, contrast: 1.16, sat: 0.98, warmSat: 0.35, lift: [0.004, 0.009, 0.012], lampScale: 1.4,
+    lamps: [[0xff8a30, 0.8], [0x70f0e0, 0.2]], flood: 0xa8f0ff, accents: [[0xff1f6a, 0.45], [0x18f0ff, 0.4], [0xff4a10, 0.15]], accentDensity: 0.75, wet: 0.95, puddle: 0.5, rain: 1, shafts: 0.025, rim: 0x48d8ff, rimI: 0.75,
+    tint: [1.04, 0.99, 0.92], shadowTint: [0.76, 0.94, 1.22], exposure: 1.3, contrast: 1.2, sat: 1.05, warmSat: 0.4, lift: [0.004, 0.009, 0.012], lampScale: 1.4,
   },
   toxic: {
-    name: 'Toxic Smog', fog: 0x101616, fogD: 0.013, haze: 0x243230, fogH: [0.13, 0.1], scatter: 0.001, mist: [0.34, 0.4, 0.28], embers: 0.1, ash: 0,
-    sun: 0xf0d8a0, sunI: 1.15, sunDir: [0.5, 0.78, 0.35], hemiS: 0x2e5260, hemiG: 0x12110e, hemiI: 0.95,
+    name: 'Toxic Smog', fog: 0x121610, fogD: 0.013, haze: 0x3a4222, fogH: [0.13, 0.1], scatter: 0.001, mist: [0.34, 0.4, 0.28], embers: 0.1, ash: 0,
+    sun: 0xe8f090, sunI: 1.2, sunDir: [0.5, 0.78, 0.35], hemiS: 0x2a4a50, hemiG: 0x12110e, hemiI: 0.95,
     sky: [0x080a08, 0x1c2418, 0x5a6038], glows: [[0x90ff40, 1.4, -0.6, 0.4, -0.5], [0x20d0c0, 1.3, 0.5, 0.5, -0.7], [0xffa030, 1.2, -0.8, 0.25, 0.5]], envI: 0.55,
-    lamps: [[0xffa040, 0.5], [0x60ffc0, 0.5]], flood: 0xd0ffd8, wet: 0.6, puddle: 0.56, rain: 0.35, shafts: 0.045, rim: 0x60ffd0, rimI: 0.55,
-    tint: [1.08, 1.0, 0.84], shadowTint: [0.86, 0.96, 1.16], exposure: 1.25, contrast: 1.2, sat: 0.78, warmSat: 0.3, lift: [0.006, 0.009, 0.009], lampScale: 1.15,
+    lamps: [[0xffa040, 0.55], [0xa0ff40, 0.45]], flood: 0xd8ffb0, accents: [[0x8cff1a, 0.45], [0xff5a0a, 0.4], [0xb040ff, 0.15]], accentDensity: 0.65, wet: 0.6, puddle: 0.56, rain: 0.35, shafts: 0.045, rim: 0x60ffd0, rimI: 0.55,
+    tint: [1.04, 1.04, 0.8], shadowTint: [0.84, 0.98, 1.12], exposure: 1.3, contrast: 1.2, sat: 0.9, warmSat: 0.3, lift: [0.006, 0.009, 0.009], lampScale: 1.15,
   },
   ash: {
     name: 'Ashfall', fog: 0x1e2024, fogD: 0.012, haze: 0x40444a, fogH: [0.12, 0.2], scatter: 0.0009, mist: [0.45, 0.46, 0.48], embers: 0.25, ash: 1.2,
-    sun: 0xe6ecf4, sunI: 1.9, sunDir: [-0.35, 0.86, 0.5], hemiS: 0x4a5a6a, hemiG: 0x18181a, hemiI: 1.0,
+    sun: 0xdfe8f4, sunI: 2.3, sunDir: [-0.35, 0.86, 0.5], hemiS: 0x587088, hemiG: 0x221e1c, hemiI: 1.35,
     sky: [0x0c0d10, 0x2c3038, 0x7a8088], glows: [[0xff6a20, 1.5, -0.5, 0.2, -0.6], [0x80c8ff, 0.9, 0.6, 0.6, 0.4]], envI: 0.5,
-    lamps: [[0xff9040, 0.85], [0x8ad8ff, 0.15]], flood: 0xffd8a8, wet: 0.15, puddle: 0.7, rain: 0, shafts: 0.05, rim: 0x9ad0ff, rimI: 0.5,
-    tint: [1.07, 0.99, 0.88], shadowTint: [0.84, 0.97, 1.12], exposure: 1.05, contrast: 1.16, sat: 0.88, warmSat: 0.4, lift: [0.007, 0.008, 0.01], lampScale: 1.1,
+    lamps: [[0xff9040, 0.85], [0x8ad8ff, 0.15]], flood: 0xffd8a8, accents: [[0xff3a0a, 0.5], [0x50b8ff, 0.32], [0xffb020, 0.18]], accentDensity: 0.6, wet: 0.15, puddle: 0.7, rain: 0, shafts: 0.05, rim: 0x9ad0ff, rimI: 0.5,
+    tint: [1.07, 0.99, 0.88], shadowTint: [0.82, 0.96, 1.16], exposure: 1.45, contrast: 1.14, sat: 0.95, warmSat: 0.45, lift: [0.01, 0.011, 0.013], lampScale: 1.1,
   },
 };
 
@@ -127,9 +128,15 @@ export class Lighting {
     }
     // extraction beacon: lift + tame it so the pad does not blow out into glare during the evac fight
     if (kind === 'pulse' && color === 0x40ff80 && intensity >= 20) { P.y = Math.max(P.y, 3.4); intensity = 13; range = 13; }
+    if (color && color.isColor && !extra.accent) { // signage: saturate + strengthen so signs read as focal lights
+      const hsl = {}; c = color.clone(); c.getHSL(hsl); if (hsl.s > 0.25) c.setHSL(hsl.h, Math.max(hsl.s, 0.9), hsl.l);
+      intensity *= 1.7; range *= 1.25;
+    }
     const s = { pos: P, color: new THREE.Color(c), intensity, range, kind, seed: Math.random() * 100, on: true, _lit: 0, ...extra };
     this.sources.push(s); return s;
   }
+  // called once the environment exists (game.js hook): palette accent neon on street facades
+  dress(env, layout) { this.accentMesh = buildAccents(this, env, layout, new RNG(((layout && layout.seed) || 1) ^ 0xacce57)); }
   removeSource(s) { const i = this.sources.indexOf(s); if (i >= 0) this.sources.splice(i, 1); }
 
   flicker(s, t) {
@@ -177,7 +184,7 @@ export class Lighting {
       const I = s.intensity * s.level * fade * (s.kind === 'lamp' ? this.p.lampScale : 1);
       l.intensity = Number.isFinite(I) ? Math.min(I, 400) : 0;
     }
-    this.fx.update(dt, this.sources, focus, 1.0, 1.0);
+    this.fx.update(dt, this.sources, focus, 1.0, this.quality === 'low' ? 1.0 : 0.55); // SSR covers on-screen lights on med/high
     if (this.rain) this.rain.update(dt, focus);
     if (this.shafts) this.shafts.update(dt, focus);
   }

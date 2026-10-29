@@ -21,8 +21,8 @@ export class Volumetrics {
     const mat = new THREE.ShaderMaterial({ uniforms: { uColor: { value: new THREE.Color(color) }, uI: { value: 1 } }, vertexShader: VS, fragmentShader: FS, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
     const m = new THREE.Mesh(this.geo, mat);
     m.position.copy(pos); m.scale.set(radius / 2.6, len / 6, radius / 2.6); m.renderOrder = 7;
-    const g = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color: new THREE.Color(color).multiplyScalar(2.5), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false }));
-    g.position.copy(pos); g.scale.setScalar(1.6); g.renderOrder = 7;
+    const g = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color: new THREE.Color(color).multiplyScalar(1.5), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false }));
+    g.position.copy(pos); g.scale.setScalar(1.25); g.renderOrder = 7;
     this.scene.add(m); this.scene.add(g);
     this.items.push({ m, g, source, base: 1 });
   }

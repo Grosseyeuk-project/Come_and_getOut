@@ -3,6 +3,7 @@
 // grade: exposure, log-space contrast, split toning, hue-preserving filmic tonemap, sRGB, lift, vignette,
 // grain, chroma, damage + fade.
 import * as THREE from 'three';
+import { atmo, PUDDLE_GLSL } from './atmosphere.js';
 
 const VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`;
 
@@ -17,21 +18,77 @@ export const ScatterShader = {
     tDiffuse: { value: null }, tDepth: { value: null }, uMax: { value: 48 }, uN: { value: 0 }, uK: { value: 0.003 },
     uProjInv: { value: new THREE.Matrix4() }, uL: { value: Array.from({ length: MAX_SCATTER }, () => new THREE.Vector4()) },
     uLC: { value: Array.from({ length: MAX_SCATTER }, () => new THREE.Vector3()) }, uMaxDist: { value: 70 },
+    // screen-space reflections on wet ground
+    uProj: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() }, uUpV: { value: new THREE.Vector3(0, 1, 0) },
+    uSSR: { value: 0 }, uSteps: { value: 16 }, uTime: { value: 0 }, uWet: { value: atmo.wet }, uRes: { value: new THREE.Vector2(1, 1) },
   },
   vertexShader: VS,
   fragmentShader: `
-    #define MAXL ${16}
-    uniform sampler2D tDiffuse, tDepth; uniform float uMax, uK, uMaxDist; uniform int uN; uniform mat4 uProjInv;
+    #define MAXL ${MAX_SCATTER}
+    uniform sampler2D tDiffuse, tDepth; uniform float uMax, uK, uMaxDist, uSSR, uTime; uniform int uN, uSteps; uniform mat4 uProjInv, uProj, uCamWorld;
+    uniform vec3 uUpV; uniform vec4 uWet; uniform vec2 uRes;
     uniform vec4 uL[MAXL]; uniform vec3 uLC[MAXL]; varying vec2 vUv;
+    ${PUDDLE_GLSL}
     bool bad(float v){ return !(v >= 0.0 && v <= 65000.0) || isnan(v) || isinf(v); }
+    vec3 clean(vec3 c){ if (bad(c.r) || bad(c.g) || bad(c.b)) return vec3(0.0); float m = max(c.r, max(c.g, c.b)); return m > uMax ? c * (uMax / m) : c; }
+    vec3 viewPos(vec2 uv, float d){ vec4 vp = uProjInv * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0); return vp.xyz / vp.w; }
     void main(){
-      vec4 c = texture2D(tDiffuse, vUv);
-      if (bad(c.r) || bad(c.g) || bad(c.b)) c.rgb = vec3(0.0);
-      float m = max(c.r, max(c.g, c.b));
-      if (m > uMax) c.rgb *= uMax / m;
+      vec3 col = clean(texture2D(tDiffuse, vUv).rgb);
+      float d = texture2D(tDepth, vUv).x;
+      vec3 V = viewPos(vUv, d);
+      // geometric normal from depth derivatives (outside any branch): only up-facing ground gets reflections
+      vec3 n = normalize(cross(dFdx(V), dFdy(V)) + 1e-7); if (dot(n, V) > 0.0) n = -n;
+      if (uSSR > 0.0 && d < 0.9999) {
+        float up = dot(n, uUpV);
+        vec3 W = (uCamWorld * vec4(V, 1.0)).xyz;
+        if (up > 0.9 && W.y < 0.4) {
+          float pv = atmoPuddle(W.xz);
+          float pd = smoothstep(uWet.y - 0.02, uWet.y + 0.06, pv);
+          float wet = uWet.x * (0.3 + 0.7 * pd);
+          if (wet > 0.02) {
+            // rain ripples + roughness outside puddles perturb the mirror normal
+            float rough = 1.0 - pd;
+            vec2 rp = W.xz * 7.0 + uTime * 0.7;
+            vec3 pn = normalize(uUpV + (vec3(atmoNoise(rp), 0.0, atmoNoise(rp + 3.7)) - 0.5) * (0.03 + rough * 0.22) * vec3(1.0, 0.0, 1.0));
+            vec3 R = reflect(normalize(V), pn);
+            float jit = atmoHash(gl_FragCoord.xy + fract(uTime) * 37.0);
+            float t = 0.0, st = 0.3; vec2 huv = vec2(-1.0); vec3 P = V; vec3 glow = vec3(0.0); float gw = 0.0;
+            for (int i = 0; i < 40; i++) {
+              if (i >= uSteps) break;
+              t += st * (0.9 + jit * 0.2); st *= 1.13;
+              P = V + R * t;
+              vec4 cp = uProj * vec4(P, 1.0); vec2 uv = cp.xy / cp.w * 0.5 + 0.5;
+              if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
+              float sz = viewPos(uv, texture2D(tDepth, uv).x).z;
+              float dz = sz - P.z; // > 0: ray is behind the visible surface
+              if (dz > 0.0 && dz < 0.6 + t * 0.12) {
+                float a = t - st, b = t;
+                for (int k = 0; k < 4; k++) {
+                  float m = 0.5 * (a + b); vec3 Q = V + R * m; vec4 cq = uProj * vec4(Q, 1.0); vec2 uq = cq.xy / cq.w * 0.5 + 0.5;
+                  if (viewPos(uq, texture2D(tDepth, uq).x).z - Q.z > 0.0) b = m; else a = m;
+                }
+                P = V + R * b; vec4 cf = uProj * vec4(P, 1.0); huv = cf.xy / cf.w * 0.5 + 0.5;
+                break;
+              }
+              // depth-less gather: glows, sprites and fire do not write depth, so collect bright HDR light the
+              // mirrored ray passes in front of (lamp halos, flames, neon bloom, muzzle flashes)
+              vec3 sc = clean(texture2D(tDiffuse, uv).rgb);
+              float sl = max(sc.r, max(sc.g, sc.b));
+              float wgt = smoothstep(1.4, 5.0, sl) * exp(-t * 0.2);
+              glow += sc * wgt; gw += 1.0;
+            }
+            float ee = 1.0;
+            vec3 refl = glow / max(gw, 1.0) * 1.6;
+            if (huv.x >= 0.0) {
+              vec2 e = smoothstep(0.0, 0.08, huv) * smoothstep(1.0, 0.92, huv);
+              ee = e.x * e.y * (1.0 - smoothstep(7.0, 18.0, t));
+              refl += clean(texture2D(tDiffuse, huv).rgb) * ee;
+            }
+            col = col * (1.0 - 0.3 * wet) + refl * (uSSR * wet);
+          }
+        }
+      }
       if (uN > 0) {
-        float d = texture2D(tDepth, vUv).x;
-        vec4 vp = uProjInv * vec4(vUv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0); vec3 V = vp.xyz / vp.w;
         float tl = min(length(V), uMaxDist); vec3 rd = normalize(V);
         vec3 sc = vec3(0.0);
         for (int i = 0; i < MAXL; i++) {
@@ -42,9 +99,9 @@ export const ScatterShader = {
           float fr = clamp(1.0 - h / uL[i].w, 0.0, 1.0);
           sc += uLC[i] * (I * fr * fr);
         }
-        sc *= uK; c.rgb += sc / (1.0 + max(sc.r, max(sc.g, sc.b)) * 0.6);
+        sc *= uK; col += sc / (1.0 + max(sc.r, max(sc.g, sc.b)) * 0.6);
       }
-      gl_FragColor = vec4(c.rgb, 1.0);
+      gl_FragColor = vec4(col, 1.0);
     }`,
 };
 

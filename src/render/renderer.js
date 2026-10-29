@@ -68,6 +68,12 @@ export class Renderer {
         u.uLC.value[n].set(l.color.r, l.color.g, l.color.b).multiplyScalar(l.intensity); n++;
       }
       u.uN.value = n; u.uK.value = (sc && sc.userData.grade && sc.userData.grade.scatter) || 0;
+      // SSR on wet ground: off on low, short march on med, long march on high
+      u.uSSR.value = this.quality === 'low' ? 0 : ((sc && sc.userData.grade && sc.userData.grade.ssr) ?? 0.8);
+      u.uSteps.value = this.quality === 'high' ? 32 : 18;
+      u.uProj.value.copy(cam.projectionMatrix); u.uCamWorld.value.copy(cam.matrixWorld);
+      u.uUpV.value.set(0, 1, 0).transformDirection(cam.matrixWorldInverse);
+      u.uTime.value += dt || 0;
       base(renderer, writeBuffer, readBuffer, dt, mask);
     };
     this.composer.addPass(sp);
@@ -90,7 +96,7 @@ export class Renderer {
         this.composer.addPass(this.ao);
       } catch (e) { console.warn('GTAO disabled', e); }
     }
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(w / 2, h / 2), 0.6, 0.55, 0.9);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(w / 2, h / 2), 0.72, 0.42, 1.1);
     this.composer.addPass(this.bloom);
     this.grade = new ShaderPass(FinalShader);
     this.composer.addPass(this.grade);
