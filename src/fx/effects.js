@@ -196,7 +196,7 @@ export class Effects {
     // a tight spurt of mist right at the exit (small: no full-screen haze)
     for (let i = 0; i < 2; i++) this.wet.emit({ x: x + bx * 0.2, y, z: z + bz * 0.2, vx: bx * (2 + Math.random() * 2), vy: Math.random() * 0.6, vz: bz * (2 + Math.random() * 2), life: 0.3, s0: 0.25, s1: 0.8 + P * 0.2, c0: B.mist, c1: B.mistEnd, drag: 5 });
     // hot fragments: thin directional streaks
-    for (let i = 0; i < 4 + P * 2; i++) {
+    for (let i = 0; i < Math.round(1 + P * 3); i++) {
       const d = cone(bx, 0.2, bz, 0.35), sp = 6 + Math.random() * 8;
       this.streaks.emit({ x, y, z, vx: d[0] * sp, vy: d[1] * sp, vz: d[2] * sp, life: 0.12 + Math.random() * 0.15, trail: 0.03, w: 0.024, c0: B.spark, c1: [0.6, 0.05, 0.02, 0], grav: 10, drag: 2 });
     }
@@ -226,7 +226,7 @@ export class Effects {
   killBurst(x, y, z, bx, bz, type = 'raider', size = 1) {
     const B = type === 'mutant' ? ICHOR : BLOOD;
     const C = type === 'mutant' ? [2.6, 3.4, 0.6, 1] : [5, 1.8, 0.5, 1];
-    this.star.emit({ x, y, z, life: 0.06, s0: 0.9 * size, s1: 0.4, c0: [5, 4.6, 4.2, 1], c1: [C[0] * 0.3, C[1] * 0.3, C[2] * 0.3, 0] });
+    this.star.emit({ x, y, z, life: 0.05, s0: 0.6 * size, s1: 0.3, c0: [3.5, 3.2, 3, 1], c1: [C[0] * 0.3, C[1] * 0.3, C[2] * 0.3, 0] });
     // big directional gore cone + bits flying out the back
     for (let i = 0; i < 40 * size; i++) { const d = cone(bx, 0.35, bz, 0.55), sp = 3 + Math.random() * 8; this.wet.emit({ x, y, z, vx: d[0] * sp, vy: d[1] * sp, vz: d[2] * sp, life: 0.5 + Math.random() * 0.5, s0: 0.12 + Math.random() * 0.16, s1: 0.06, c0: B.drop, c1: B.dropEnd, grav: 13, floor: 0.04, drag: 0.5 }); }
     for (let i = 0; i < 6 * size; i++) { const d = cone(bx, 0.6, bz, 0.6), sp = 3 + Math.random() * 5; this.gibs.emit({ x, y, z, vx: d[0] * sp, vy: d[1] * sp + 1, vz: d[2] * sp, s: (0.04 + Math.random() * 0.06) * size, sx: 1 + Math.random(), life: 14, color: B.gib[(Math.random() * B.gib.length) | 0], spin: 25, bounce: 0.2, onLand: (q) => this.splat(q.x, q.z, Math.atan2(q.vz, q.vx), 0.4 + Math.random() * 0.3, B) }); }
@@ -353,11 +353,11 @@ function flashTexture() { return T.softSprite('flash', 1, 0); }
 
 // gore palettes (linear colours; droplets are unlit sprites so keep them saturated enough to read)
 const BLOOD = { drop: [0.85, 0.05, 0.03, 1], dropEnd: [0.45, 0.02, 0.01, 0.9], mist: [0.6, 0.05, 0.04, 0.45], mistEnd: [0.25, 0.01, 0.01, 0], glint: [2.4, 0.35, 0.15, 1], spark: [4, 0.9, 0.3, 1], gib: [0x7a1410, 0x5a0c0a, 0x8a2a20, 0x9a7a6a] };
-const ICHOR = { drop: [0.38, 0.45, 0.05, 1], dropEnd: [0.18, 0.22, 0.02, 0.9], mist: [0.3, 0.38, 0.06, 0.35], mistEnd: [0.15, 0.2, 0.02, 0], glint: [1.4, 1.9, 0.2, 1], spark: [2.4, 3, 0.5, 1], gib: [0x4a5a14, 0x3a3a10, 0x6a7a2a, 0x8a8a6a] };
+const ICHOR = { drop: [0.38, 0.45, 0.05, 1], dropEnd: [0.18, 0.22, 0.02, 0.9], mist: [0.3, 0.38, 0.06, 0.35], mistEnd: [0.15, 0.2, 0.02, 0], glint: [1.4, 1.9, 0.2, 1], spark: [1.5, 1.9, 0.35, 1], gib: [0x4a5a14, 0x3a3a10, 0x6a7a2a, 0x8a8a6a] };
 const BULLETS = { // speed m/s, tail seconds, width m (~0.09m = 3-4px at gameplay zoom), HDR colours
   rifle: { speed: 150, tail: 0.035, w: 0.085, c: [4.5, 2.6, 0.9, 1], c1: [3, 1.2, 0.3, 0.8], core: [6, 5.2, 3.8, 1] },
   smg: { speed: 140, tail: 0.028, w: 0.07, c: [4.5, 2.3, 0.8, 1], c1: [3, 1, 0.25, 0.8], core: [6, 5, 3.5, 1] },
-  shotgun: { speed: 110, tail: 0.03, w: 0.07, c: [5, 2, 0.5, 1], c1: [2.5, 0.6, 0.1, 0.6] },
+  shotgun: { speed: 110, tail: 0.03, w: 0.055, c: [3.2, 1.4, 0.35, 1], c1: [1.8, 0.5, 0.1, 0.6] },
   dmr: { speed: 220, tail: 0.04, w: 0.16, c: [3.5, 3.2, 2.8, 1], c1: [2.5, 1.6, 0.8, 0.8], core: [8, 8, 7.5, 1] },
 };
 // random unit vector in a cone around (ax, ay, az) (not normalised input), half-angle ~spread*90deg

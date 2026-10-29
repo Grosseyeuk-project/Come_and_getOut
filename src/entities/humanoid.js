@@ -15,7 +15,7 @@ const UP_NEG = new V(0, -1, 0);
 const _v1 = new V(), _v2 = new V(), _v3 = new V(), _v4 = new V(), _q = new THREE.Quaternion();
 
 const KINDS = {
-  player: { cloth: 0x2e3238, pants: 0x24272b, vest: 0x1c1e22, plate: 0x4a525a, skin: 0xa07e66, boots: 0x1a1714, gloves: 0x18191a, accent: 0x38d8ff, eye: 0x38d8ff, scale: 1.22, rim: [0.22, 0.48, 0.7] },
+  player: { cloth: 0x2e3238, pants: 0x24272b, vest: 0x1c1e22, plate: 0x4a525a, skin: 0xa07e66, boots: 0x1a1714, gloves: 0x18191a, accent: 0x38d8ff, eye: 0x38d8ff, scale: 1.22, rim: [0.06, 0.14, 0.22] },
   raider: { cloth: 0x5a2a18, pants: 0x3a3226, vest: 0x2e241c, plate: 0x6a4a2e, skin: 0x8a6a56, boots: 0x1c1712, gloves: 0x2a1d14, accent: 0xff3a14, eye: 0xff2a10, scale: 1.14, rim: [0.6, 0.15, 0.06] },
   mutant: { cloth: 0x2e2a22, pants: 0x2b2820, vest: 0x2a2620, plate: 0x3a3a30, skin: 0x8a9478, boots: 0x3b382e, gloves: 0x7a8468, accent: 0xb4ff3a, eye: 0xd4ff30, scale: 1.12, rim: [0.4, 0.75, 0.1] },
   brute: { cloth: 0x2a221c, pants: 0x2a221c, vest: 0x3a2a20, plate: 0x6a6258, skin: 0x7a6252, boots: 0x2a2018, gloves: 0x3a3430, accent: 0xff6a1a, eye: 0xff8a20, scale: 1.72, rim: [0.6, 0.28, 0.06] },
@@ -38,7 +38,7 @@ export class Humanoid {
       skin: new THREE.MeshStandardMaterial({ color: K.skin, roughness: 0.6 }),
       boots: new THREE.MeshStandardMaterial({ color: K.boots, roughness: 0.6 }),
       gloves: new THREE.MeshStandardMaterial({ color: K.gloves, roughness: 0.7 }),
-      accent: new THREE.MeshStandardMaterial({ color: 0x000000, emissive: K.accent, emissiveIntensity: kind === 'mutant' ? 2.6 : 3.5 }),
+      accent: new THREE.MeshStandardMaterial({ color: 0x000000, emissive: K.accent, emissiveIntensity: kind === 'mutant' ? 2.6 : kind === 'player' ? 1.5 : 3.5 }),
       eye: new THREE.MeshStandardMaterial({ color: 0x000000, emissive: K.eye, emissiveIntensity: 6 }),
       bone: new THREE.MeshStandardMaterial({ color: 0xc8bca0, roughness: 0.6 }),
       rust: new THREE.MeshStandardMaterial({ color: 0x5a3a26, roughness: 0.8, metalness: 0.4 }),
@@ -230,7 +230,7 @@ export class Humanoid {
     this.weaponMount = G(this.chest, 0.08, 0.02, 0.32);
     this.weapon = null;
     root.scale.setScalar(K.scale);
-    this.flashC = { player: [1.2, 0.3, 0.2], raider: [2.2, 1.3, 0.8], mutant: [1.6, 2.2, 0.6], brute: [2.4, 1.4, 0.6] }[kind];
+    this.flashC = { player: [1.2, 0.3, 0.2], raider: [1.5, 0.9, 0.55], mutant: [0.9, 1.2, 0.35], brute: [1.6, 0.95, 0.4] }[kind];
     this.phase = Math.random() * 6; this.legYaw = 0; this.flash = 0; this.flinch = new V(); this.flinchV = new V(); this.recoil = 0;
     this.deathT = -1; this.deathDir = 1; this.dissolve = 0; this.dissolveAt = 11;
     this.attackT = -1; this.crouch = 0; this.crouchB = 0; this.capeSwing = 0; this.lean = { x: 0, z: 0 }; this.lastFace = 0; this.turnRate = 0;
