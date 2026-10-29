@@ -320,7 +320,7 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
   }
   // opts: { push, gib, headshot, kind }
   die(dirX, dirZ, opts = {}) {
-    this.deathT = 0; this.flash = 1;
+    this.deathT = 0; this.flash = 0.6;
     const l = Math.hypot(dirX, dirZ) || 1; dirX /= l; dirZ /= l;
     this.deathHit = { x: dirX, z: dirZ };
     const push = opts.push ?? 2.5;

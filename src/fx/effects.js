@@ -233,13 +233,14 @@ export class Effects {
     for (let i = 0; i < 14; i++) { const d = cone(bx, 0.4, bz, 0.6), sp = 7 + Math.random() * 10; this.streaks.emit({ x, y, z, vx: d[0] * sp, vy: d[1] * sp, vz: d[2] * sp, life: 0.15 + Math.random() * 0.25, trail: 0.03, w: 0.03, c0: C, c1: [C[0] * 0.2, C[1] * 0.1, C[2] * 0.05, 0], grav: 12, drag: 1.5, bounce: 0.4 }); }
     // ground shock: dust kicked out around the feet
     for (let i = 0; i < 8; i++) { const a = (i / 8) * 6.283; this.smoke.emit({ x, y: 0.3, z, vx: Math.cos(a) * 2.5 + bx * 2, vy: 0.3, vz: Math.sin(a) * 2.5 + bz * 2, life: 0.8, s0: 0.4, s1: 1.2 * size, c0: [0.5, 0.46, 0.42, 0.35], c1: [0.4, 0.4, 0.4, 0], drag: 4 }); }
-    this.flashLight(x, y + 0.5, z, type === 'mutant' ? 0x9aff40 : 0xff7a30, 18 * size, 6 * size, 0.1);
+    this.flashLight(x, y + 0.5, z, 0xff8a40, 12 * size, 5 * size, 0.08);
   }
   // bright pop where loot lands
-  lootPop(x, z, color = [3, 2.6, 1.6]) {
-    this.star.emit({ x, y: 0.5, z, life: 0.25, s0: 2.4, s1: 0.4, c0: [color[0], color[1], color[2], 1], c1: [color[0] * 0.3, color[1] * 0.3, color[2] * 0.3, 0] });
-    for (let i = 0; i < 6; i++) this.streaks.emit({ x, y: 0.1, z, vx: (Math.random() - 0.5) * 1.5, vy: 7 + Math.random() * 5, vz: (Math.random() - 0.5) * 1.5, life: 0.35, trail: 0.03, w: 0.03, c0: [color[0], color[1], color[2], 1], c1: [0, 0, 0, 0], grav: 6, drag: 2 });
+  lootPop(x, z, color = [3, 2.6, 1.6]) { // thin rising sparks in rarity colour (no bloom blob)
+    const c = [Math.min(2.5, color[0] * 0.5), Math.min(2.5, color[1] * 0.5), Math.min(2.5, color[2] * 0.5), 1];
+    for (let i = 0; i < 6; i++) this.streaks.emit({ x, y: 0.1, z, vx: (Math.random() - 0.5) * 1.5, vy: 6 + Math.random() * 4, vz: (Math.random() - 0.5) * 1.5, life: 0.3, trail: 0.025, w: 0.025, c0: c, c1: [0, 0, 0, 0], grav: 6, drag: 2 });
   }
+
   pool(x, z, s = 1.6, kind = 'blood', delay = 0.5) { const B = kind === 'ichor' ? ICHOR : BLOOD; this.decal(B.poolMat, x, z, s, Math.random() * 6.28, 3.5, delay); }
 
   splat(x, z, ang, s, B = BLOOD) { this.decal(B.splatMats[(Math.random() * B.splatMats.length) | 0], x, z, s, -ang, 0.12); }
@@ -354,10 +355,10 @@ function flashTexture() { return T.softSprite('flash', 1, 0); }
 const BLOOD = { drop: [0.85, 0.05, 0.03, 1], dropEnd: [0.45, 0.02, 0.01, 0.9], mist: [0.6, 0.05, 0.04, 0.45], mistEnd: [0.25, 0.01, 0.01, 0], glint: [2.4, 0.35, 0.15, 1], spark: [4, 0.9, 0.3, 1], gib: [0x7a1410, 0x5a0c0a, 0x8a2a20, 0x9a7a6a] };
 const ICHOR = { drop: [0.38, 0.45, 0.05, 1], dropEnd: [0.18, 0.22, 0.02, 0.9], mist: [0.3, 0.38, 0.06, 0.35], mistEnd: [0.15, 0.2, 0.02, 0], glint: [1.4, 1.9, 0.2, 1], spark: [2.4, 3, 0.5, 1], gib: [0x4a5a14, 0x3a3a10, 0x6a7a2a, 0x8a8a6a] };
 const BULLETS = { // speed m/s, tail seconds, width m (~0.09m = 3-4px at gameplay zoom), HDR colours
-  rifle: { speed: 150, tail: 0.1, w: 0.085, c: [4.5, 2.6, 0.9, 1], c1: [3, 1.2, 0.3, 0.8], core: [6, 5.2, 3.8, 1] },
-  smg: { speed: 140, tail: 0.07, w: 0.07, c: [4.5, 2.3, 0.8, 1], c1: [3, 1, 0.25, 0.8], core: [6, 5, 3.5, 1] },
-  shotgun: { speed: 110, tail: 0.06, w: 0.07, c: [5, 2, 0.5, 1], c1: [2.5, 0.6, 0.1, 0.6] },
-  dmr: { speed: 220, tail: 0.1, w: 0.16, c: [3.5, 3.2, 2.8, 1], c1: [2.5, 1.6, 0.8, 0.8], core: [8, 8, 7.5, 1] },
+  rifle: { speed: 150, tail: 0.035, w: 0.085, c: [4.5, 2.6, 0.9, 1], c1: [3, 1.2, 0.3, 0.8], core: [6, 5.2, 3.8, 1] },
+  smg: { speed: 140, tail: 0.028, w: 0.07, c: [4.5, 2.3, 0.8, 1], c1: [3, 1, 0.25, 0.8], core: [6, 5, 3.5, 1] },
+  shotgun: { speed: 110, tail: 0.03, w: 0.07, c: [5, 2, 0.5, 1], c1: [2.5, 0.6, 0.1, 0.6] },
+  dmr: { speed: 220, tail: 0.04, w: 0.16, c: [3.5, 3.2, 2.8, 1], c1: [2.5, 1.6, 0.8, 0.8], core: [8, 8, 7.5, 1] },
 };
 // random unit vector in a cone around (ax, ay, az) (not normalised input), half-angle ~spread*90deg
 function cone(ax, ay, az, spread) {
