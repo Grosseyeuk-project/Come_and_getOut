@@ -97,6 +97,7 @@ export class Environment {
     this.rubble.build(this.root); this.bricks.build(this.root); this.debris.build(this.root); this.rebar.build(this.root);
     this.litter.build(this.root); this.cans.build(this.root); this.shards.build(this.root); this.pebbles.build(this.root);
     this.buildGrass();
+    this.buildOvergrowth();
   }
 
   setH(x0, z0, x1, z1, h) {
@@ -1170,6 +1171,30 @@ export class Environment {
       im.receiveShadow = true; im.renderOrder = 1;
       this.root.add(im);
     }
+  }
+
+  // saturated mutated overgrowth (instanced leaf clumps): building bases, park beds, ruin lots, curb cracks
+  buildOvergrowth() {
+    const L = this.L, col = this.col, rng = new RNG(L.seed ^ 0x0f01), pal = L.foliage || [0xc01818];
+    const vars = [0, 1, 2].map((i) => { const g = P.leafClump(new RNG(900 + i), 1); g.translate(0, 0.35, 0); colorize(g, 0xffffff); return g; });
+    const sc = new Scatter(this.M.foliage, vars, false);
+    const put = (x, z, s) => { if (col.blockedCircle(x, z, 0.3, 0.2) && rng.chance(0.7)) return; sc.add(x, this.heightAt(x, z), z, [s, s * rng.range(0.6, 1.1), s], 0, rng.range(0, 6.3), 0, new THREE.Color(rng.pick(pal)).multiplyScalar(rng.range(0.55, 1.15)).getHex()); };
+    for (const b of L.buildings) {
+      for (let i = 0; i < (b.x1 - b.x0 + b.z1 - b.z0) * 0.45; i++) {
+        const side = rng.int(0, 3); let x, z;
+        if (side === 0) { x = rng.range(b.x0, b.x1); z = b.z0 - rng.range(0.2, 0.7); } else if (side === 1) { x = rng.range(b.x0, b.x1); z = b.z1 + rng.range(0.2, 0.7); }
+        else if (side === 2) { x = b.x0 - rng.range(0.2, 0.7); z = rng.range(b.z0, b.z1); } else { x = b.x1 + rng.range(0.2, 0.7); z = rng.range(b.z0, b.z1); }
+        if (fbm(x * 0.12, z * 0.12, 2, 41) < 0.5) continue;
+        put(x, z, rng.range(0.45, 0.9));
+      }
+      if (b.collapsed || b.damage > 0.6) for (let i = 0; i < (b.x1 - b.x0) * (b.z1 - b.z0) / 14; i++) put(rng.range(b.x0 + 0.6, b.x1 - 0.6), rng.range(b.z0 + 0.6, b.z1 - 0.6), rng.range(0.5, 1.1));
+    }
+    for (const a of L.grassAreas) for (let i = 0; i < (a.x1 - a.x0) * (a.z1 - a.z0) * 0.05 * a.density; i++) {
+      const x = rng.range(a.x0, a.x1), z = rng.range(a.z0, a.z1);
+      if (fbm(x * 0.07, z * 0.07, 2, 43) < 0.48) continue;
+      put(x, z, rng.range(0.6, 1.4));
+    }
+    sc.build(this.root);
   }
 
   buildGrass() {
