@@ -310,7 +310,7 @@ if (uDissolve > 0.0) { float e = 1.0 - smoothstep(0.0, 0.07, dsv - uDissolve); o
 
   // Hero-only readability: an inverted-hull outline drawn after the VFX so it stays visible through sparks/smoke.
   addSilhouette(geo, skeleton) {
-    const hull = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.86, 0.6), side: THREE.BackSide, transparent: true, opacity: 0.6, depthWrite: false, fog: false });
+    const hull = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.86, 0.6), side: THREE.BackSide, transparent: true, opacity: 0.45, depthWrite: false, fog: false });
     hull.onBeforeCompile = (sh) => { sh.vertexShader = sh.vertexShader.replace('#include <skinning_vertex>', '#include <skinning_vertex>\ntransformed += normalize(objectNormal) * 0.035;'); };
     hull.customProgramCacheKey = () => 'hero-hull';
     for (const [mat, order] of [[hull, 9]]) { // (an x-ray fill self-occludes without a stencil buffer; walls are cut out instead)
