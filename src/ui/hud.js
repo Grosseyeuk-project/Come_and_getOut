@@ -23,6 +23,7 @@ export class HUD {
     ds.setProperty('--grain', `url(${S.grain})`); ds.setProperty('--metal', `url(${S.metal})`);
     const root = document.createElement('div'); root.id = 'hud';
     root.innerHTML = `
+      <div id="bars"></div><div id="lootlabels"></div><div id="dmg"></div>
       <div id="objective" class="mpanel"><div class="ohd"><i class="haz"></i><span class="lbl">Objective</span><span id="zone"></span></div><div class="t" id="objt">Find the extraction point</div><div class="d"><i class="chev"></i><span id="objd"></span></div></div>
       <div id="mmwrap"><canvas id="minimap" width="400" height="400"></canvas><div id="mmlabel"></div></div>
       <div id="health" class="mpanel"><div class="vhd"><span class="lbl">Vitals</span><span class="cs">Scav-07</span><b id="hptext">100</b><small id="hpmax">/100</small></div>
@@ -33,7 +34,7 @@ export class HUD {
         <div id="magpips"></div><div id="reloadbar"><i></i><span>Reloading</span></div>
         <div id="wsec"><kbd>Q</kbd><img id="w2icon" alt=""><span id="w2name"></span><b id="w2mag"></b></div></div>
       <div id="feed"></div>
-      <div id="bars"></div><div id="lootlabels"></div><div id="dmg"></div><div id="prompts"><div id="prompt" class="hidden"></div></div>
+      <div id="prompts"><div id="prompt" class="hidden"></div></div>
       <div id="toast"></div><div id="callout"></div><div id="flyers"></div>
       <div id="extractbar" class="mpanel hidden"><div class="ehd"><i class="haz"></i><span id="extt">Evac inbound</span><b id="extn"></b></div><div class="bar"><i id="extfill"></i></div><div class="lbl">Hold the zone</div></div>
       <div id="crosshair"><i class="dot"></i><i id="ch0"></i><i id="ch1"></i><i id="ch2"></i><i id="ch3"></i>
@@ -249,13 +250,19 @@ export class HUD {
 
   // Diablo-style nameplates over nearby drops (stacked so they never overlap) + compare tooltip docked to
   // the side of the focused item, away from the player.
-  updateLoot() {
+  updateLoot(dt) {
     const g = this.game, p = g.player, f = g.loot.focus, playing = g.mode === 'playing' && !this.inventoryOpen;
     const ps = this.project(p.pos.x, 1.0, p.pos.z);
+    // combat state: firing, just hurt, or an alerted hostile nearby -> no big stat card, compact nameplate only
+    const hot = g.input.mouse.down || this.chipHold > 0 || g.enemies.alive.some((e) => e.alert && Math.hypot(e.pos.x - p.pos.x, e.pos.z - p.pos.z) < 20);
+    this.combatT = hot ? 2.5 : Math.max(0, (this.combatT || 0) - dt);
+    const blockers = [{ x0: ps.x - 36, x1: ps.x + 36, y0: ps.y - 80, y1: ps.y + 40 }];
+    for (const e of g.enemies.alive) { const es = this.project(e.pos.x, 1.0, e.pos.z); if (es.vis) blockers.push({ x0: es.x - 34, x1: es.x + 34, y0: es.y - 80, y1: es.y + 36 }); }
+    const card = playing && f ? this.placeCard(f, ps, blockers) : false;
     const seen = new Set(), placed = [{ x0: ps.x - 34, x1: ps.x + 34, y0: ps.y - 70, y1: ps.y + 34 }];
     const drops = playing ? g.loot.drops.filter((d) => d.t >= 1 && Math.hypot(d.x - p.pos.x, d.z - p.pos.z) < (d.item.kind === 'weapon' ? 15 : 7)) : [];
     const items = [];
-    for (const d of drops) { if (d === f) continue; const s = this.project(d.x, 0.5, d.z); if (s.vis) items.push({ d, s }); }
+    for (const d of drops) { if (d === f && card) continue; const s = this.project(d.x, 0.5, d.z); if (s.vis) items.push({ d, s }); }
     items.sort((a, b) => b.s.y - a.s.y);
     for (const { d, s } of items) {
       seen.add(d);
@@ -263,7 +270,8 @@ export class HUD {
       if (!l) {
         const it = d.item, R = RARITY[it.rarity], el = document.createElement('div');
         el.className = `ll r${R.tier}${it.kind === 'weapon' ? '' : ' minor'}`; el.style.setProperty('--rc', R.color);
-        el.innerHTML = `<kbd>E</kbd><i class="dia"></i><span>${esc(it.kind === 'scrap' ? `Salvage ×${it.amount}` : it.name)}</span>`;
+        const dd = it.kind === 'weapon' ? dps(it) - dps(p.weapon) : null;
+        el.innerHTML = `<kbd>E</kbd><i class="dia"></i><span>${esc(it.kind === 'scrap' ? `Salvage ×${it.amount}` : it.name)}</span>${dd !== null ? `<em class="${dd > 0 ? 'up' : dd < 0 ? 'down' : 'eq'}">${dd > 0 ? '▲' : dd < 0 ? '▼' : '='}${dd ? Math.abs(dd) : ''}</em>` : ''}`;
         $('lootlabels').appendChild(el); l = { el, w: 0 }; this.labels.set(d, l);
       }
       if (!l.w) l.w = l.el.offsetWidth || 120;
@@ -275,9 +283,13 @@ export class HUD {
       l.el.classList.toggle('focus', d === f);
     }
     for (const [d, l] of this.labels) if (!seen.has(d)) { l.el.remove(); this.labels.delete(d); }
-    // focused item / crate tooltip
-    const pr = $('prompt');
-    if (!f || !playing) { pr.classList.add('hidden'); return; }
+  }
+
+  // Big stat card next to the focused item: only out of combat, on the side away from the player, and only
+  // where it covers neither the player nor any visible enemy. Returns false -> compact nameplate instead.
+  placeCard(f, ps, blockers) {
+    const pr = $('prompt'), g = this.game, p = g.player;
+    if (this.combatT > 0 && f.kind !== 'crate') { pr.classList.add('hidden'); return false; }
     const s = this.project(f.x, 0.3, f.z);
     const key = f.kind === 'crate' ? 'crate' + f.tier + f.x : 'd' + f.item.id + ':' + p.weapon.id;
     if (pr.dataset.key !== key) {
@@ -288,13 +300,17 @@ export class HUD {
       } else { pr.className = 'card'; pr.innerHTML = cardHTML(f.item, f.item.kind === 'weapon' ? p.weapon : null, { keys: '<span class="k"><kbd>E</kbd>Pick up</span>' }); }
       pr.dataset.w = pr.offsetWidth; pr.dataset.h = pr.offsetHeight;
     }
-    const W = +pr.dataset.w || 280, H = +pr.dataset.h || 200;
-    const side = s.x >= ps.x ? 1 : -1, gap = f.kind === 'crate' ? 34 : 46;
-    let x = side > 0 ? Math.max(s.x, ps.x + 34) + gap : Math.min(s.x, ps.x - 34) - gap - W;
-    if (x + W > innerWidth - 250 && side > 0) x = Math.min(s.x, ps.x - 34) - gap - W;
-    if (x < 12) x = Math.max(s.x, ps.x + 34) + gap;
+    pr.classList.remove('hidden');
+    const W = +pr.dataset.w || 280, H = +pr.dataset.h || 200, gap = f.kind === 'crate' ? 34 : 46;
     const y = Math.max(70, Math.min(innerHeight - 140 - H, s.y - H * 0.5));
-    pr.style.transform = `translate(${x | 0}px,${y | 0}px)`;
+    const right = Math.max(s.x, ps.x + 36) + gap, left = Math.min(s.x, ps.x - 36) - gap - W;
+    const opts = s.x >= ps.x ? [right, left] : [left, right];
+    for (const x of opts) {
+      if (x < 12 || x + W > innerWidth - 230) continue;
+      if (blockers.some((r) => x < r.x1 && x + W > r.x0 && y < r.y1 && y + H > r.y0)) continue;
+      pr.style.transform = `translate(${x | 0}px,${y | 0}px)`; return true;
+    }
+    pr.classList.add('hidden'); return false;
   }
 
   drawMinimap() {

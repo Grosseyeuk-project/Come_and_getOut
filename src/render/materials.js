@@ -28,6 +28,15 @@ export function applyCutout(mat) {
         {
           vec3 toP = uCutPos - cameraPosition; float lenP = length(toP); vec3 dP = toP / lenP;
           vec3 toF = vCutW - cameraPosition; float along = dot(toF, dP);
+          // camera-side occluders (foreground buildings / roofs that fill the frame without covering the
+          // player): tall geometry well in front of the player's focal plane is stippled ~70% see-through
+          {
+            float front = lenP - along;
+            float kf = smoothstep(5.0, 11.0, front) * smoothstep(2.2, 4.5, vCutW.y) * 0.72;
+            ivec2 fp = ivec2(mod(floor(gl_FragCoord.xy), 4.0));
+            const float FM[16] = float[16](0., 8., 2., 10., 12., 4., 14., 6., 3., 11., 1., 9., 15., 7., 13., 5.);
+            if (kf > (FM[fp.x + fp.y * 4] + 0.5) / 16.0) discard;
+          }
           if (along < lenP - 0.8 && vCutW.y > 0.25) {
             float d = length(toF - dP * along);
             float fade = smoothstep(0.0, 2.5, lenP - along);

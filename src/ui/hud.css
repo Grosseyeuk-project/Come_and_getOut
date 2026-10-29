@@ -123,6 +123,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .ll { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px 0 7px; white-space: nowrap; will-change: transform;
   background: linear-gradient(180deg, rgba(14,13,12,0.88), rgba(6,6,6,0.9)); border: 1px solid rgba(255,255,255,0.08); border-left: 2px solid var(--rc); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--rc); text-shadow: 0 1px 2px #000; }
 .ll kbd { display: none; }
+.ll em { font-style: normal; font-size: 10px; font-weight: 700; margin-left: 2px; }
 .ll .dia { width: 7px; height: 7px; background: var(--rc); transform: rotate(45deg); box-shadow: 0 0 6px var(--rc); }
 .ll.minor { height: 18px; font-size: 10px; opacity: 0.8; color: #cfc8b8; border-left-color: #6f6a60; } .ll.minor .dia { display: none; }
 .ll.r3 { border-color: color-mix(in srgb, var(--rc) 45%, transparent); box-shadow: 0 0 10px color-mix(in srgb, var(--rc) 30%, transparent); }
